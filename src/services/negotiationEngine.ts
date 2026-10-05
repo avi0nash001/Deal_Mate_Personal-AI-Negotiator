@@ -1,53 +1,139 @@
-import { Product, NegotiationOffer, NegotiationSession, DealToken, ActivityLogEntry, Seller } from '../types';
+import {
+  Product,
+  NegotiationOffer,
+  NegotiationSession,
+  DealToken,
+  ActivityLogEntry,
+  CategoryNegotiationSetting,
+  NegotiationExchangeTurn,
+} from '../types';
 import { SELLERS } from '../data/catalog';
+
+export const MAX_SINGLE_ITEM_DISCOUNT = 15; // 15% default -> 0.85 floor
+export const MAX_BUNDLE_DISCOUNT = 20; // 20% default -> 0.80 floor
+
+/**
+ * Computes the strict minimum allowed unit price given listPrice and optional
+ * seller category max discount % (0-40). Falls back to 15% single / 20% bundle.
+ */
+export function priceFloor(
+  listPrice: number,
+  maxDiscountPct?: number,
+  isBundle: boolean = false
+): number {
+  const defaultPct = isBundle ? MAX_BUNDLE_DISCOUNT : MAX_SINGLE_ITEM_DISCOUNT;
+  const boundedPct =
+    typeof maxDiscountPct === 'number' && !Number.isNaN(maxDiscountPct)
+      ? Math.max(0, Math.min(40, maxDiscountPct))
+      : defaultPct;
+  return Math.round(listPrice * (1 - boundedPct / 100));
+}
+
+/**
+ * Clamps any proposed price to [priceFloor(listPrice, maxDiscountPct), listPrice].
+ */
+export function clampPrice(
+  proposedPrice: number,
+  listPrice: number,
+  maxDiscountPct?: number,
+  isBundle: boolean = false
+): number {
+  const floor = priceFloor(listPrice, maxDiscountPct, isBundle);
+  return Math.max(floor, Math.min(listPrice, Math.round(proposedPrice)));
+}
+
+/**
+ * Resolves the applicable max discount % for a product from category_negotiation_settings
+ * by matching (sellerId + category).
+ */
+export function resolveCategorySetting(
+  product: Product,
+  settings: CategoryNegotiationSetting[] = []
+): CategoryNegotiationSetting | undefined {
+  const normCat = (product.category || '').trim().toLowerCase();
+  const byExactSeller = settings.find(
+    (s) =>
+      s.sellerId === product.sellerId &&
+      s.category.trim().toLowerCase() === normCat
+  );
+  if (byExactSeller) return byExactSeller;
+
+  // Fallback to any store owner setting for that category if sellerId is a default store alias
+  return settings.find((s) => s.category.trim().toLowerCase() === normCat);
+}
 
 export class NegotiationEngine {
   /**
-   * Initialize a new negotiation session
+   * Initialize a new negotiation session respecting category_negotiation_settings
    */
   static createSession(
     product: Product,
-    userBudget: { target: number; maxBudget: number }
+    userBudget: { target: number; maxBudget: number },
+    categorySettings: CategoryNegotiationSetting[] = []
   ): NegotiationSession {
     const id = 'neg_' + Math.random().toString(36).substring(2, 9);
     const createdAt = Date.now();
     const expiresAt = createdAt + 15 * 60 * 1000; // 15 mins lock
 
+    const matchedSetting = resolveCategorySetting(product, categorySettings);
+    const effectiveFloor = matchedSetting
+      ? priceFloor(product.listPrice, matchedSetting.maxSingleDiscountPct, false)
+      : priceFloor(product.listPrice, product.maxDiscountPercent || MAX_SINGLE_ITEM_DISCOUNT, false);
+
+    const normalizedProduct: Product = {
+      ...product,
+      minAcceptablePrice: effectiveFloor,
+      maxDiscountPercent:
+        matchedSetting?.maxSingleDiscountPct ??
+        product.maxDiscountPercent ??
+        MAX_SINGLE_ITEM_DISCOUNT,
+    };
+
     return {
       id,
-      productId: product.id,
-      product,
+      productId: normalizedProduct.id,
+      product: normalizedProduct,
       userBudget: {
         target: Math.max(100, userBudget.target),
         maxBudget: Math.max(userBudget.target, userBudget.maxBudget),
       },
-      currentOffer: product.listPrice,
-      originalPrice: product.listPrice,
+      currentOffer: normalizedProduct.listPrice,
+      originalPrice: normalizedProduct.listPrice,
       status: 'NEGOTIATION_STARTED',
       offers: [],
-      activeSellerId: product.sellerId,
+      activeSellerId: normalizedProduct.sellerId,
       createdAt,
       expiresAt,
     };
   }
 
   /**
-   * Run the next step of negotiation
+   * Run the next step of negotiation (always clamped by priceFloor / clampPrice)
    */
   static processStep(
     session: NegotiationSession,
-    stepIndex: number
+    stepIndex: number,
+    categorySettings: CategoryNegotiationSetting[] = []
   ): {
     updatedSession: NegotiationSession;
     newOffer: NegotiationOffer;
     logEntry: ActivityLogEntry;
   } {
     const { product, userBudget, offers } = session;
-    const seller = SELLERS.find((s) => s.id === session.activeSellerId) || SELLERS[0];
+    const seller = SELLERS.find((s) => s.id === session.activeSellerId) || {
+      id: product.sellerId,
+      name: product.sellerName || SELLERS[0].name,
+    };
     const target = userBudget.target;
     const maxBudget = userBudget.maxBudget;
     const listPrice = product.listPrice;
-    const floorPrice = product.minAcceptablePrice;
+
+    const matchedSetting = resolveCategorySetting(product, categorySettings);
+    const maxDiscountPct =
+      matchedSetting?.maxSingleDiscountPct ??
+      product.maxDiscountPercent ??
+      MAX_SINGLE_ITEM_DISCOUNT;
+    const floorPrice = priceFloor(listPrice, maxDiscountPct, false);
 
     let speaker: 'BUYER' | 'SELLER' = 'BUYER';
     let offerPrice = listPrice;
@@ -61,82 +147,71 @@ export class NegotiationEngine {
     // Step 0: Buyer Initial Offer
     if (stepIndex === 0) {
       speaker = 'BUYER';
-      // First offer is usually near target or 2-4% below target to anchor
       offerPrice = Math.round(Math.min(target, target * 0.98));
-      message = `Buyer AI initialized anchor offer of ₹${offerPrice.toLocaleString('en-IN')} for ${product.name} (Target: ₹${target.toLocaleString('en-IN')}). Immediate payment capability flagged.`;
+      message = `Buyer's Agent: Offering ₹${offerPrice.toLocaleString('en-IN')} for ${product.name} (Target: ₹${target.toLocaleString('en-IN')}). Immediate checkout readiness confirmed.`;
       nextSessionStatus = 'BUYER_OFFER';
       status = 'PENDING';
       logStep = 'BUYER_OFFER_INITIALIZED';
-      logDetail = `Anchor price computed at ₹${offerPrice}. Constraint check: <= maxBudget (₹${maxBudget}) passed.`;
+      logDetail = `Buyer anchor computed at ₹${offerPrice}. Category floor policy: max ${maxDiscountPct}% discount (₹${floorPrice}).`;
     }
     // Step 1: Seller Counter 1
     else if (stepIndex === 1) {
       speaker = 'SELLER';
-      // Seller concessions based on inventory & floor price
       const buyerFirst = offers[0]?.price || target;
-      // Seller counters mid-way between list price and floor price
-      const calculatedCounter = Math.round(listPrice - (listPrice - floorPrice) * 0.35);
-      offerPrice = Math.max(floorPrice + 100, calculatedCounter);
-      message = `${seller.name}: Stock level is ${product.stock} units with high demand. We cannot meet ₹${buyerFirst.toLocaleString('en-IN')}, but we can offer priority fulfillment at ₹${offerPrice.toLocaleString('en-IN')}.`;
+      const calculatedCounter = Math.round(listPrice - (listPrice - floorPrice) * 0.45);
+      offerPrice = clampPrice(Math.max(floorPrice, calculatedCounter), listPrice, maxDiscountPct, false);
+      message = `Seller's Agent (${seller.name}): We can't do ₹${buyerFirst.toLocaleString('en-IN')}, but I can come down to ₹${offerPrice.toLocaleString('en-IN')} — that's close to what ${product.category.toLowerCase()} items move at this month.`;
       nextSessionStatus = 'SELLER_COUNTER';
       status = 'COUNTERED';
       logStep = 'SELLER_COUNTER_EVALUATED';
-      logDetail = `Seller concession rate: 35% of allowable margin. Price: ₹${offerPrice}. Stock reserve locked.`;
+      logDetail = `Seller counter clamped to ₹${offerPrice} (Category floor: ₹${floorPrice}).`;
     }
     // Step 2: Buyer Counter 2
     else if (stepIndex === 2) {
       speaker = 'BUYER';
       const sellerLast = offers[1]?.price || listPrice;
-      // Buyer inches upward toward target / mid-point
-      const buyerStep = Math.round(target + (Math.min(sellerLast, maxBudget) - target) * 0.35);
+      const buyerStep = Math.round(target + (Math.min(sellerLast, maxBudget) - target) * 0.5);
       offerPrice = Math.min(buyerStep, maxBudget);
-      message = `Buyer AI: Cross-referenced competing marketplace pricing. Countering at ₹${offerPrice.toLocaleString('en-IN')} with instant checkout verification.`;
+      message = `Buyer's Agent: Stepping up our offer to ₹${offerPrice.toLocaleString('en-IN')} to lock this deal immediately.`;
       nextSessionStatus = 'BUYER_COUNTER';
       status = 'PENDING';
       logStep = 'BUYER_COUNTER_DISPATCHED';
-      logDetail = `Concession delta: +₹${offerPrice - (offers[0]?.price || target)}. Price adheres to max ceiling ₹${maxBudget}.`;
+      logDetail = `Buyer counter-offer ₹${offerPrice} dispatched.`;
     }
     // Step 3: Seller Final Concession / Counter 2
     else if (stepIndex === 3) {
       speaker = 'SELLER';
-      // Seller makes final best offer near or at floor + healthy buffer
-      const floorBuffer = Math.round((listPrice - floorPrice) * 0.12);
-      offerPrice = Math.max(floorPrice, floorPrice + floorBuffer);
-      
-      // Ensure if floorPrice is within maxBudget, it creates a viable deal
-      if (offerPrice > maxBudget && floorPrice <= maxBudget) {
-        offerPrice = maxBudget;
+      const floorBuffer = Math.round((listPrice - floorPrice) * 0.1);
+      let candidate = Math.max(floorPrice, floorPrice + floorBuffer);
+      if (candidate > maxBudget && floorPrice <= maxBudget) {
+        candidate = Math.max(floorPrice, maxBudget);
       }
+      offerPrice = clampPrice(candidate, listPrice, maxDiscountPct, false);
 
-      message = `${seller.name}: Executive pricing engine authorized optimal concession. We can close this transaction at ₹${offerPrice.toLocaleString('en-IN')} with standard 1-year brand warranty.`;
+      message = `Seller's Agent (${seller.name}): Our final authorized floor-protected offer for ${product.name} is ₹${offerPrice.toLocaleString('en-IN')} with full warranty and priority fulfillment.`;
       nextSessionStatus = 'SELLER_COUNTER';
       status = 'COUNTERED';
       logStep = 'SELLER_OPTIMAL_CONCESSION';
-      logDetail = `Near-floor clearing price reached at ₹${offerPrice} (Min floor: ₹${floorPrice}). Margin verified.`;
+      logDetail = `Final seller counter clamped at ₹${offerPrice} (Min category floor: ₹${floorPrice}, Max discount: ${maxDiscountPct}%).`;
     }
-    // Step 4: Deal Accepted or Terminal Decision
+    // Step 4: Deal Accepted or Settled at Clamped Floor
     else {
       speaker = 'BUYER';
-      const lastSellerOffer = offers[offers.length - 1]?.price || product.listPrice;
-      
-      if (lastSellerOffer <= maxBudget) {
-        offerPrice = lastSellerOffer;
-        nextSessionStatus = 'DEAL_ACCEPTED';
-        status = 'ACCEPTED';
-        const totalSaved = listPrice - offerPrice;
-        message = `Buyer AI: Seller counter-offer ₹${offerPrice.toLocaleString('en-IN')} meets all budgetary criteria (Ceiling: ₹${maxBudget.toLocaleString('en-IN')}). Deal successfully accepted! You save ₹${totalSaved.toLocaleString('en-IN')}.`;
-        logStep = 'DEAL_ACCEPTED_AND_LOCKED';
-        logDetail = `Deal secured at ₹${offerPrice}. Original: ₹${listPrice}, Net savings: ₹${totalSaved}. Token generated.`;
-        logType = 'success';
-      } else {
-        offerPrice = lastSellerOffer;
-        nextSessionStatus = 'BUDGET_EXCEEDED';
-        status = 'REJECTED';
-        message = `Buyer AI: Seller's lowest offer (₹${lastSellerOffer.toLocaleString('en-IN')}) exceeds your hard budget constraint of ₹${maxBudget.toLocaleString('en-IN')}. Negotiation terminated to protect your funds.`;
-        logStep = 'BUDGET_VIOLATION_ABORT';
-        logDetail = `Aborted: Offer ₹${lastSellerOffer} > Max budget ₹${maxBudget}.`;
-        logType = 'warning';
-      }
+      const lastSellerOffer = clampPrice(
+        offers[offers.length - 1]?.price || floorPrice,
+        listPrice,
+        maxDiscountPct,
+        false
+      );
+
+      offerPrice = lastSellerOffer;
+      nextSessionStatus = 'DEAL_ACCEPTED';
+      status = 'ACCEPTED';
+      const totalSaved = Math.max(0, listPrice - offerPrice);
+      message = `Buyer's Agent: Deal settled at ₹${offerPrice.toLocaleString('en-IN')} with ${seller.name}! You save ₹${totalSaved.toLocaleString('en-IN')} (${Math.round((totalSaved / listPrice) * 100)}% off list price).`;
+      logStep = 'DEAL_ACCEPTED_AND_LOCKED';
+      logDetail = `Deal secured at ₹${offerPrice} (>= floor ₹${floorPrice}). Net savings: ₹${totalSaved}.`;
+      logType = 'success';
     }
 
     const newOffer: NegotiationOffer = {
@@ -158,12 +233,20 @@ export class NegotiationEngine {
 
     const updatedSession: NegotiationSession = {
       ...session,
+      product: {
+        ...product,
+        minAcceptablePrice: floorPrice,
+        maxDiscountPercent: maxDiscountPct,
+      },
       currentOffer: offerPrice,
       status: nextSessionStatus,
       offers: newOffers,
       finalPrice: nextSessionStatus === 'DEAL_ACCEPTED' ? offerPrice : undefined,
       totalSaved: nextSessionStatus === 'DEAL_ACCEPTED' ? totalSaved : undefined,
-      token: nextSessionStatus === 'DEAL_ACCEPTED' ? 'DLM-' + Math.random().toString(36).substring(2, 10).toUpperCase() : undefined,
+      token:
+        nextSessionStatus === 'DEAL_ACCEPTED'
+          ? 'DLM-' + Math.random().toString(36).substring(2, 10).toUpperCase()
+          : undefined,
     };
 
     const logEntry: ActivityLogEntry = {
@@ -179,11 +262,75 @@ export class NegotiationEngine {
   }
 
   /**
+   * Convert server-side /api/negotiation/run-exchange turns into a settled NegotiationSession
+   */
+  static applyExchangeTurns(
+    session: NegotiationSession,
+    turns: NegotiationExchangeTurn[],
+    settledPrice: number,
+    floorPrice: number
+  ): {
+    updatedSession: NegotiationSession;
+    logs: ActivityLogEntry[];
+  } {
+    const now = Date.now();
+    const mappedOffers: NegotiationOffer[] = turns.map((t, idx) => ({
+      id: `off_live_${idx}_${now}`,
+      round: t.round,
+      speaker: t.speaker === 'BUYER_AGENT' ? 'BUYER' : 'SELLER',
+      sellerId: session.product.sellerId,
+      sellerName: session.product.sellerName,
+      price: t.price,
+      message: t.message,
+      timestamp: now + idx * 400,
+      status:
+        idx === turns.length - 1
+          ? 'ACCEPTED'
+          : t.speaker === 'SELLER_AGENT'
+          ? 'COUNTERED'
+          : 'PENDING',
+      deltaFromTarget: t.price - session.userBudget.target,
+      savingsSoFar: session.originalPrice - t.price,
+    }));
+
+    const finalSaved = Math.max(0, session.originalPrice - settledPrice);
+
+    const updatedSession: NegotiationSession = {
+      ...session,
+      product: {
+        ...session.product,
+        minAcceptablePrice: floorPrice,
+      },
+      currentOffer: settledPrice,
+      finalPrice: settledPrice,
+      totalSaved: finalSaved,
+      status: 'DEAL_ACCEPTED',
+      offers: mappedOffers,
+      token: 'DLM-' + Math.random().toString(36).substring(2, 10).toUpperCase(),
+    };
+
+    const logs: ActivityLogEntry[] = turns.map((t, idx) => ({
+      id: `log_live_${idx}_${now}`,
+      timestamp: new Date().toLocaleTimeString(),
+      agent: t.speaker,
+      step:
+        idx === turns.length - 1
+          ? 'DEAL_SETTLED_AT_FLOOR_VERIFIED_PRICE'
+          : `ROUND_${t.round}_${t.speaker}`,
+      detail: `${t.message} (Clamped Floor: ₹${floorPrice})`,
+      type: idx === turns.length - 1 ? 'success' : 'info',
+    }));
+
+    return { updatedSession, logs };
+  }
+
+  /**
    * Run multi-seller comparison
    */
   static runMultiSellerComparison(
     product: Product,
-    targetPrice: number
+    _targetPrice: number,
+    categorySettings: CategoryNegotiationSetting[] = []
   ): Array<{
     sellerId: string;
     sellerName: string;
@@ -193,31 +340,35 @@ export class NegotiationEngine {
     isBest?: boolean;
   }> {
     const list = product.listPrice;
-    const floor = product.minAcceptablePrice;
+    const matchedSetting = resolveCategorySetting(product, categorySettings);
+    const floor = priceFloor(
+      list,
+      matchedSetting?.maxSingleDiscountPct ?? product.maxDiscountPercent ?? MAX_SINGLE_ITEM_DISCOUNT,
+      false
+    );
 
     const results = SELLERS.map((seller, idx) => {
-      let variance = 0;
+      let variance = 0.92;
       if (seller.negotiationFlexibility === 'flexible') {
-        variance = 0.88; // e.g. 12% drop
+        variance = 0.87;
       } else if (seller.negotiationFlexibility === 'moderate') {
-        variance = 0.92; // 8% drop
+        variance = 0.91;
       } else {
-        variance = 0.95; // 5% drop
+        variance = 0.94;
       }
 
       const calculated = Math.round(list * variance);
-      const offeredPrice = Math.max(floor + (idx * 30), calculated);
+      const offeredPrice = Math.max(floor + idx * 25, calculated);
 
       return {
         sellerId: seller.id,
         sellerName: seller.name,
         offeredPrice,
         deliveryDays: idx === 0 ? 2 : idx === 1 ? 1 : 3,
-        stock: product.stock - (idx * 5),
+        stock: Math.max(2, product.stock - idx * 3),
       };
     });
 
-    // Mark the best price
     const minPrice = Math.min(...results.map((r) => r.offeredPrice));
     return results.map((r) => ({
       ...r,
@@ -229,7 +380,8 @@ export class NegotiationEngine {
    * Generate secure Deal Token for checkout
    */
   static generateDealToken(session: NegotiationSession): DealToken {
-    if (!session.finalPrice) {
+    const settled = session.finalPrice ?? session.currentOffer;
+    if (!settled) {
       throw new Error('Cannot lock deal token without accepted final price');
     }
 
@@ -238,8 +390,8 @@ export class NegotiationEngine {
       productId: session.productId,
       sellerId: session.activeSellerId,
       originalPrice: session.originalPrice,
-      finalPrice: session.finalPrice,
-      savings: session.originalPrice - session.finalPrice,
+      finalPrice: settled,
+      savings: Math.max(0, session.originalPrice - settled),
       buyerMaxBudget: session.userBudget.maxBudget,
       status: 'LOCKED',
       expiresAt: Date.now() + 15 * 60 * 1000,

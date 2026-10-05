@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Product, UserRequirement, LocalStore } from '../../types';
+import {
+  Product,
+  UserRequirement,
+  LocalStore,
+  CategoryNegotiationSetting,
+} from '../../types';
 import { RecommendationEngine } from '../../services/recommendationEngine';
 import {
   ArrowRight,
@@ -25,14 +30,19 @@ import {
 interface AIShoppingAgentProps {
   products: Product[];
   localStores: LocalStore[];
+  categorySettings?: CategoryNegotiationSetting[];
   initialQuery?: string;
   initialBudget?: number;
+  recentSearches?: string[];
   onNegotiateProduct: (product: Product, targetPrice: number, maxBudget: number) => void;
+  onBuySettledProduct?: (product: Product, settledUnitPrice: number) => void;
   onCompareToggle: (product: Product) => void;
   comparedProductIds: string[];
   onSaveToggle: (product: Product) => void;
   savedProductIds: string[];
   onViewStore: (store: LocalStore) => void;
+  onOpenVoiceModal?: () => void;
+  onLiveProductsFetched?: (liveProducts: Product[]) => void;
 }
 
 type Message = {
@@ -431,13 +441,6 @@ const ProductResultCard: React.FC<{
           <button className="primary" onClick={onNegotiate}><Zap className="h-3.5 w-3.5" /> Negotiate</button>
         </div>
       </div>
-          className="w-full py-2.5 bg-gradient-to-r from-cyan-500 via-teal-400 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-slate-950 font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition-all transform hover:-translate-y-0.5 active:translate-y-0"
-        >
-          <Zap className="w-3.5 h-3.5 text-slate-950 font-bold" />
-          <span>Negotiate with Store AI</span>
-          <ArrowRight className="w-3 h-3 text-slate-950 font-bold" />
-        </button>
-      </div>
-    </div>
+    </article>
   );
 };

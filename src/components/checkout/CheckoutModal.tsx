@@ -1,12 +1,32 @@
 import React, { useState } from 'react';
-import { Product, DealToken, Order } from '../../types';
-import { X, ShieldCheck, CheckCircle2, Lock, Truck, CreditCard, DollarSign, ArrowRight } from 'lucide-react';
+import {
+  Product,
+  DealToken,
+  Order,
+  CategoryNegotiationSetting,
+} from '../../types';
+import {
+  resolveCategorySetting,
+  priceFloor,
+  MAX_SINGLE_ITEM_DISCOUNT,
+} from '../../services/negotiationEngine';
+import { getAuthHeaders } from '../../services/authHeaders';
+import {
+  X,
+  ShieldCheck,
+  Lock,
+  Truck,
+  CreditCard,
+  ArrowRight,
+  AlertCircle,
+} from 'lucide-react';
 
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product;
   dealToken: DealToken;
+  categorySettings?: CategoryNegotiationSetting[];
   onOrderConfirmed: (order: Order) => void;
 }
 
@@ -15,31 +35,78 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   product,
   dealToken,
+  categorySettings = [],
   onOrderConfirmed,
 }) => {
-  const [fullName, setFullName] = useState('Alex Rivers');
+  const [quantity, setQuantity] = useState<number>(1);
+  const [fullName, setFullName] = useState('Aarav Sharma');
   const [phone, setPhone] = useState('+91 98765 43210');
   const [address, setAddress] = useState('402 Silicon Heights, Outer Ring Road');
   const [city, setCity] = useState('Bengaluru');
   const [postalCode, setPostalCode] = useState('560103');
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CREDIT_CARD' | 'COD'>('UPI');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmitOrder = (e: React.FormEvent) => {
+  const matchedSetting = resolveCategorySetting(product, categorySettings);
+  const maxSingleDiscountPct =
+    matchedSetting?.maxSingleDiscountPct ??
+    product.maxDiscountPercent ??
+    MAX_SINGLE_ITEM_DISCOUNT;
+  const maxBundleDiscountPct = matchedSetting?.maxBundleDiscountPct ?? 20;
+  const isBundle = quantity > 1 && product.bundleEligible;
+  const effectiveFloor = priceFloor(
+    product.listPrice,
+    isBundle ? maxBundleDiscountPct : maxSingleDiscountPct,
+    isBundle
+  );
+
+  const unitPrice = dealToken.finalPrice;
+  const totalPaid = unitPrice * quantity;
+  const totalSaved = Math.max(0, (dealToken.originalPrice - unitPrice) * quantity);
+
+  const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    setOrderError(null);
     setIsProcessing(true);
 
-    setTimeout(() => {
+    try {
+      // Server-side place_order verification against category_negotiation_settings floor
+      const res = await fetch('/api/orders/place-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          product,
+          unitPrice,
+          quantity,
+          maxSingleDiscountPct,
+          maxBundleDiscountPct,
+          isBundle,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.verified) {
+        setOrderError(
+          data.error ||
+            `Order rejected: unitPrice ₹${unitPrice} is below the store category floor of ₹${effectiveFloor}.`
+        );
+        setIsProcessing(false);
+        return;
+      }
+
       const orderId = 'ORD-' + Math.random().toString(36).substring(2, 8).toUpperCase();
       const order: Order = {
         id: orderId,
         dealToken,
         product,
-        quantity: 1,
-        totalPaid: dealToken.finalPrice,
-        totalSaved: dealToken.savings,
+        quantity: data.quantity || quantity,
+        totalPaid: data.totalPaid || totalPaid,
+        totalSaved: data.totalSaved || totalSaved,
         status: 'CONFIRMED',
         shippingAddress: {
           fullName,
@@ -56,7 +123,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setIsProcessing(false);
       onOrderConfirmed(order);
       onClose();
-    }, 1000);
+    } catch (err: any) {
+      setOrderError(err?.message || 'Unable to verify order floor price.');
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -77,16 +147,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
           <div>
             <h2 className="font-display font-bold text-lg text-white">
-              Checkout & Order Confirmation
+              Checkout & Order Confirmation (place_order Verified)
             </h2>
             <div className="flex items-center gap-2 text-xs font-mono text-emerald-400">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Negotiated Price Locked: ₹{dealToken.finalPrice.toLocaleString('en-IN')}</span>
+              <span>
+                Settled Unit Price: ₹{unitPrice.toLocaleString('en-IN')} · Category Floor: ₹
+                {effectiveFloor.toLocaleString('en-IN')}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Deal Summary Banner */}
+        {/* Deal Summary Banner + Quantity Control */}
         <div className="mt-4 p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
@@ -98,23 +171,43 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div>
               <h4 className="text-xs font-bold text-white line-clamp-1">{product.name}</h4>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Token: <span className="text-emerald-300 font-bold">{dealToken.dealHash.slice(0, 16)}</span>
+                Seller: <span className="text-emerald-300 font-bold">{product.sellerName}</span>
               </p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-[11px] font-mono text-slate-300">Quantity:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, product.stock)}
+                  value={quantity}
+                  onChange={(e) =>
+                    setQuantity(Math.max(1, Math.min(product.stock || 10, Number(e.target.value) || 1)))
+                  }
+                  className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 font-mono text-xs text-white text-center"
+                />
+              </div>
             </div>
           </div>
 
           <div className="text-right sm:border-l sm:border-emerald-500/20 sm:pl-4">
             <div className="text-xs text-slate-400 line-through font-mono">
-              ₹{dealToken.originalPrice.toLocaleString('en-IN')}
+              ₹{(dealToken.originalPrice * quantity).toLocaleString('en-IN')}
             </div>
             <div className="text-2xl font-extrabold font-mono text-emerald-400">
-              ₹{dealToken.finalPrice.toLocaleString('en-IN')}
+              ₹{totalPaid.toLocaleString('en-IN')}
             </div>
             <div className="text-[11px] font-mono text-emerald-300 font-semibold">
-              You Save ₹{dealToken.savings.toLocaleString('en-IN')}
+              You Save ₹{totalSaved.toLocaleString('en-IN')}
             </div>
           </div>
         </div>
+
+        {orderError && (
+          <div className="mt-4 p-3 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{orderError}</span>
+          </div>
+        )}
 
         {/* Form Body */}
         <form onSubmit={handleSubmitOrder} className="mt-6 space-y-5">
@@ -127,7 +220,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">Full Name</label>
+                <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                  Full Name
+                </label>
                 <input
                   type="text"
                   required
@@ -138,7 +233,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">Phone Number</label>
+                <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                  Phone Number
+                </label>
                 <input
                   type="text"
                   required
@@ -149,7 +246,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">Street Address</label>
+                <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                  Street Address
+                </label>
                 <input
                   type="text"
                   required
@@ -171,7 +270,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">Postal Code</label>
+                <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                  Postal Code
+                </label>
                 <input
                   type="text"
                   required
@@ -244,10 +345,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               className="px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer transition-transform transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
             >
               {isProcessing ? (
-                <span>Confirming Order...</span>
+                <span>Verifying Floor & Confirming...</span>
               ) : (
                 <>
-                  <span>CONFIRM ORDER (₹{dealToken.finalPrice.toLocaleString('en-IN')})</span>
+                  <span>CONFIRM ORDER (₹{totalPaid.toLocaleString('en-IN')})</span>
                   <ArrowRight className="w-4 h-4 font-bold" />
                 </>
               )}

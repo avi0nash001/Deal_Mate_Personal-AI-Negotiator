@@ -1,0 +1,313 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Represents a registered platform user, store owner, or administrator with negotiation savings telemetry.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Registered email address",
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Full name or display handle",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "description": "Account role on the platform",
+          "enum": ["user", "store_owner", "admin"]
+        },
+        "storeName": {
+          "type": "string",
+          "description": "Store name if the account is a store_owner",
+          "maxLength": 120
+        },
+        "totalSaved": {
+          "type": "number",
+          "description": "Cumulative amount saved in INR via AI negotiations"
+        },
+        "totalSpent": {
+          "type": "number",
+          "description": "Cumulative amount spent in INR"
+        },
+        "negotiationsCount": {
+          "type": "integer",
+          "description": "Total number of negotiations participated in"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "totalSaved", "totalSpent", "negotiationsCount", "createdAt", "updatedAt"]
+    },
+    "StoreProduct": {
+      "title": "StoreProduct",
+      "description": "A product listed by a Store Owner via QR code scanning or catalog entry.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique product identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Product title",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "brand": {
+          "type": "string",
+          "description": "Brand name",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "category": {
+          "type": "string",
+          "description": "Product category",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "listPrice": {
+          "type": "number",
+          "description": "Store listed selling price in INR"
+        },
+        "marketPrice": {
+          "type": "number",
+          "description": "MRP or online benchmark price in INR"
+        },
+        "minAcceptablePrice": {
+          "type": "number",
+          "description": "Minimum floor price for AI negotiation in INR"
+        },
+        "stock": {
+          "type": "integer",
+          "description": "Available inventory units"
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "UID of the store owner who listed the product",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sellerName": {
+          "type": "string",
+          "description": "Name of the store or merchant",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "qrCodeData": {
+          "type": "string",
+          "description": "Scanned QR code payload or SKU code",
+          "maxLength": 500
+        },
+        "image": {
+          "type": "string",
+          "description": "Product image URL",
+          "maxLength": 1000
+        },
+        "description": {
+          "type": "string",
+          "description": "Product description",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Listing timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "brand",
+        "category",
+        "listPrice",
+        "marketPrice",
+        "minAcceptablePrice",
+        "stock",
+        "sellerId",
+        "sellerName",
+        "qrCodeData",
+        "image",
+        "description",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "NegotiationRecord": {
+      "title": "NegotiationRecord",
+      "description": "Audit record of a negotiation outcome and savings achieved between a user and a store owner.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Record ID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the buyer",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userName": {
+          "type": "string",
+          "description": "Display name of the buyer",
+          "maxLength": 100
+        },
+        "userEmail": {
+          "type": "string",
+          "description": "Email of the buyer",
+          "maxLength": 254
+        },
+        "productId": {
+          "type": "string",
+          "description": "ID of the negotiated product",
+          "maxLength": 128
+        },
+        "productName": {
+          "type": "string",
+          "description": "Name of the negotiated product",
+          "maxLength": 160
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "ID or UID of the seller/store owner",
+          "maxLength": 128
+        },
+        "sellerName": {
+          "type": "string",
+          "description": "Name of the store/seller",
+          "maxLength": 120
+        },
+        "originalPrice": {
+          "type": "number",
+          "description": "Original list price in INR"
+        },
+        "finalPrice": {
+          "type": "number",
+          "description": "Final negotiated price in INR"
+        },
+        "savedAmount": {
+          "type": "number",
+          "description": "Total rupees saved in this negotiation"
+        },
+        "status": {
+          "type": "string",
+          "description": "Outcome status",
+          "enum": ["DEAL_ACCEPTED", "PURCHASED"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of negotiation record"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "userName",
+        "userEmail",
+        "productId",
+        "productName",
+        "sellerId",
+        "sellerName",
+        "originalPrice",
+        "finalPrice",
+        "savedAmount",
+        "status",
+        "createdAt"
+      ]
+    },
+    "CategoryNegotiationSetting": {
+      "title": "CategoryNegotiationSetting",
+      "description": "Per-category maximum single-item and bundle discount percentages configured by a Store Owner.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Composite ID sellerId_category",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "UID of the store owner",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "category": {
+          "type": "string",
+          "description": "Product category name",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "maxSingleDiscountPct": {
+          "type": "number",
+          "description": "Max single-item discount percentage (0 to 40)"
+        },
+        "maxBundleDiscountPct": {
+          "type": "number",
+          "description": "Max bundle discount percentage (0 to 40)"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last updated timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "sellerId",
+        "category",
+        "maxSingleDiscountPct",
+        "maxBundleDiscountPct",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user, store owner, and admin profiles and cumulative negotiation savings."
+    },
+    "/storeProducts/{productId}": {
+      "schema": { "$ref": "#/entities/StoreProduct" },
+      "description": "Stores QR-scanned and merchant-listed products from verified Store Owners."
+    },
+    "/negotiationRecords/{recordId}": {
+      "schema": { "$ref": "#/entities/NegotiationRecord" },
+      "description": "Stores negotiation deals, buyer savings, and seller analytics for users, store owners, and admins."
+    },
+    "/categoryNegotiationSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/CategoryNegotiationSetting" },
+      "description": "Stores per-category max single and bundle discount percentages per store owner."
+    }
+  }
+}

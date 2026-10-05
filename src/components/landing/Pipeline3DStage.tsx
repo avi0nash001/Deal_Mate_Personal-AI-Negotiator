@@ -81,7 +81,7 @@ export const Pipeline3DStage: React.FC<Pipeline3DStageProps> = ({
   };
 
   return (
-    <section className="relative my-20 space-y-10">
+    <section className="relative my-10 sm:my-16 space-y-6 sm:space-y-10">
       {/* Ambient background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-72 bg-gradient-to-r from-cyan-600/10 via-indigo-600/15 to-emerald-600/10 blur-[100px] pointer-events-none" />
 
@@ -195,7 +195,7 @@ export const Pipeline3DStage: React.FC<Pipeline3DStageProps> = ({
           ref={containerRef}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
-          className={`relative rounded-3xl border p-8 shadow-2xl transform-style-3d transition-transform duration-200 ${
+          className={`relative rounded-3xl border p-4 sm:p-8 shadow-2xl transform-style-3d transition-transform duration-200 ${
             theme.isLight
               ? 'bg-white border-slate-200 shadow-slate-200/80'
               : 'bg-[#181D22] border-[#293139] shadow-black/80'

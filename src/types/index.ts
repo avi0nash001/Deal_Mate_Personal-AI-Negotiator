@@ -41,6 +41,134 @@ export interface Product {
   budgetTier?: 'within_budget' | 'best_value' | 'slightly_above';
   aiMatchScore?: number; // e.g. 96
   whyRecommended?: string;
+  marketplaceSource?:
+    | 'Store Owner QR Verified'
+    | 'Amazon.in'
+    | 'Flipkart'
+    | 'Myntra'
+    | 'Croma'
+    | 'Reliance Digital'
+    | 'Ajio'
+    | 'Nykaa'
+    | 'Google Search Live'
+    | 'Local Store';
+  qrCodeData?: string;
+  externalUrl?: string;
+  externalId?: string;
+  isStoreOwnerListed?: boolean;
+  isLiveGoogleSearch?: boolean;
+  searchSourceTitle?: string;
+  fetchedAt?: string;
+}
+
+export interface CategoryNegotiationSetting {
+  id: string;
+  sellerId: string;
+  category: string;
+  maxSingleDiscountPct: number; // 0-40, default 15
+  maxBundleDiscountPct: number; // 0-40, default 20
+}
+
+export interface NegotiationExchangeTurn {
+  round: number;
+  speaker: 'BUYER_AGENT' | 'SELLER_AGENT';
+  price: number;
+  message: string;
+}
+
+export type UserRole = 'user' | 'store_owner' | 'admin';
+
+export type AccountStatus = 'active' | 'disabled' | 'suspended';
+
+export type ShopApprovalStatus = 'approved' | 'pending' | 'rejected';
+
+export interface AppUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  phone?: string;
+  storeName?: string;
+  businessCategory?: string;
+  storeAddress?: string;
+  emailVerified?: boolean;
+  accountStatus?: AccountStatus;
+  shopApprovalStatus?: ShopApprovalStatus;
+  sessionToken?: string;
+  totalSaved: number;
+  totalSpent: number;
+  negotiationsCount: number;
+  createdAt: string;
+}
+
+export interface IncomingNegotiationRequest {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  listPrice: number;
+  buyerId: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerOfferPrice: number;
+  sellerCounterPrice?: number;
+  sellerId: string;
+  sellerName: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COUNTERED';
+  sellerResponseNote?: string;
+  createdAt: string;
+}
+
+export interface ReportedProductItem {
+  id: string;
+  productId: string;
+  productName: string;
+  sellerName: string;
+  reportedByEmail: string;
+  reason: string;
+  status: 'OPEN' | 'RESOLVED' | 'REMOVED';
+  createdAt: string;
+}
+
+export interface PlatformSettings {
+  requireEmailVerification: boolean;
+  requireShopOwnerApproval: boolean;
+  defaultMaxSingleDiscountPct: number;
+  defaultMaxBundleDiscountPct: number;
+  allowExternalRetailerFallback: boolean;
+  platformSupportEmail: string;
+}
+
+export interface QRProductPreset {
+  id: string;
+  qrCodeData: string;
+  sku: string;
+  name: string;
+  brand: string;
+  category: string;
+  listPrice: number;
+  marketPrice: number;
+  minAcceptablePrice: number;
+  stock: number;
+  image: string;
+  description: string;
+  specs: Record<string, string>;
+}
+
+export interface NegotiationAuditRecord {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  productId: string;
+  productName: string;
+  sellerId: string;
+  sellerName: string;
+  originalPrice: number;
+  finalPrice: number;
+  savedAmount: number;
+  status: 'DEAL_ACCEPTED' | 'PURCHASED';
+  createdAt: string;
 }
 
 export interface LocalStore {

@@ -1,0 +1,362 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Pillar 1: Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && (
+        request.auth.token.email_verified == true ||
+        request.auth.uid != null
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'hvavinash2007@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Connection health check endpoint (read-only for client boot check)
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // Admins lookup collection
+    match /admins/{adminId} {
+      allow get: if isVerifiedUser() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // Validation Blueprint: UserProfile
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+        'uid',
+        'email',
+        'displayName',
+        'role',
+        'totalSaved',
+        'totalSpent',
+        'negotiationsCount',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'uid',
+        'email',
+        'displayName',
+        'role',
+        'storeName',
+        'totalSaved',
+        'totalSpent',
+        'negotiationsCount',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      isValidId(data.uid) &&
+      data.uid == request.auth.uid &&
+      data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+      data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+      data.role in ['user', 'store_owner', 'admin'] &&
+      (!('storeName' in data) || (data.storeName is string && data.storeName.size() <= 120)) &&
+      data.totalSaved is number && data.totalSaved >= 0 &&
+      data.totalSpent is number && data.totalSpent >= 0 &&
+      data.negotiationsCount is int && data.negotiationsCount >= 0 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      // Pillar 6: PII Isolation — only owner or admin can read user profile
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isVerifiedUser() && (resource.data.uid == request.auth.uid || isAdmin());
+
+      allow create: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == userId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (incoming().role in ['user', 'store_owner'] || isAdmin());
+
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          // Action 1: Owner updates profile or negotiation savings telemetry
+          (
+            isOwner(userId) &&
+            (incoming().role in ['user', 'store_owner'] || incoming().role == existing().role) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName',
+              'role',
+              'storeName',
+              'totalSaved',
+              'totalSpent',
+              'negotiationsCount',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Validation Blueprint: StoreProduct
+    function isValidStoreProduct(data) {
+      return data.keys().hasAll([
+        'id',
+        'name',
+        'brand',
+        'category',
+        'listPrice',
+        'marketPrice',
+        'minAcceptablePrice',
+        'stock',
+        'sellerId',
+        'sellerName',
+        'qrCodeData',
+        'image',
+        'description',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id',
+        'name',
+        'brand',
+        'category',
+        'listPrice',
+        'marketPrice',
+        'minAcceptablePrice',
+        'stock',
+        'sellerId',
+        'sellerName',
+        'qrCodeData',
+        'image',
+        'description',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      isValidId(data.id) &&
+      data.name is string && data.name.size() >= 1 && data.name.size() <= 160 &&
+      data.brand is string && data.brand.size() >= 1 && data.brand.size() <= 80 &&
+      data.category is string && data.category.size() >= 1 && data.category.size() <= 60 &&
+      data.listPrice is number && data.listPrice > 0 && data.listPrice <= 10000000 &&
+      data.marketPrice is number && data.marketPrice >= data.listPrice && data.marketPrice <= 10000000 &&
+      data.minAcceptablePrice is number && data.minAcceptablePrice > 0 && data.minAcceptablePrice <= data.listPrice &&
+      data.stock is int && data.stock >= 0 && data.stock <= 100000 &&
+      isValidId(data.sellerId) &&
+      data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120 &&
+      data.qrCodeData is string && data.qrCodeData.size() >= 1 && data.qrCodeData.size() <= 500 &&
+      data.image is string && data.image.size() >= 1 && data.image.size() <= 1000 &&
+      data.description is string && data.description.size() >= 1 && data.description.size() <= 1000 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    match /storeProducts/{productId} {
+      // Public/Signed-in catalog browsing with resource.data check
+      allow get: if isValidId(productId) && resource.data.stock >= 0;
+      allow list: if resource.data.stock >= 0;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(productId) &&
+        isValidStoreProduct(incoming()) &&
+        incoming().id == productId &&
+        incoming().sellerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(productId) &&
+        isValidStoreProduct(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().sellerId == existing().sellerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().sellerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name',
+              'brand',
+              'category',
+              'listPrice',
+              'marketPrice',
+              'minAcceptablePrice',
+              'stock',
+              'qrCodeData',
+              'image',
+              'description',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerifiedUser() &&
+        isValidId(productId) &&
+        (existing().sellerId == request.auth.uid || isAdmin());
+    }
+
+    // Validation Blueprint: NegotiationRecord
+    function isValidNegotiationRecord(data) {
+      return data.keys().hasAll([
+        'id',
+        'userId',
+        'userName',
+        'userEmail',
+        'productId',
+        'productName',
+        'sellerId',
+        'sellerName',
+        'originalPrice',
+        'finalPrice',
+        'savedAmount',
+        'status',
+        'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id',
+        'userId',
+        'userName',
+        'userEmail',
+        'productId',
+        'productName',
+        'sellerId',
+        'sellerName',
+        'originalPrice',
+        'finalPrice',
+        'savedAmount',
+        'status',
+        'createdAt'
+      ]) &&
+      isValidId(data.id) &&
+      isValidId(data.userId) &&
+      data.userId == request.auth.uid &&
+      data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 100 &&
+      data.userEmail is string && data.userEmail.size() >= 3 && data.userEmail.size() <= 254 &&
+      data.productId is string && data.productId.size() >= 1 && data.productId.size() <= 128 &&
+      data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 160 &&
+      data.sellerId is string && data.sellerId.size() >= 1 && data.sellerId.size() <= 128 &&
+      data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120 &&
+      data.originalPrice is number && data.originalPrice > 0 &&
+      data.finalPrice is number && data.finalPrice > 0 && data.finalPrice <= data.originalPrice &&
+      data.savedAmount is number && data.savedAmount >= 0 &&
+      data.status in ['DEAL_ACCEPTED', 'PURCHASED'] &&
+      data.createdAt is timestamp;
+    }
+
+    match /negotiationRecords/{recordId} {
+      allow get: if isVerifiedUser() &&
+        isValidId(recordId) &&
+        (existing().userId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+
+      allow list: if isVerifiedUser() &&
+        (resource.data.userId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
+
+      allow create: if isVerifiedUser() &&
+        isValidId(recordId) &&
+        isValidNegotiationRecord(incoming()) &&
+        incoming().id == recordId &&
+        incoming().userId == request.auth.uid &&
+        incoming().createdAt == request.time;
+
+      // Terminal State Locking: Negotiation records are immutable audit logs once created
+      allow update, delete: if isValidId(recordId) && isAdmin();
+    }
+
+    // Validation Blueprint: CategoryNegotiationSetting
+    function isValidCategoryNegotiationSetting(data) {
+      return data.keys().hasAll([
+        'id',
+        'sellerId',
+        'category',
+        'maxSingleDiscountPct',
+        'maxBundleDiscountPct',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id',
+        'sellerId',
+        'category',
+        'maxSingleDiscountPct',
+        'maxBundleDiscountPct',
+        'updatedAt'
+      ]) &&
+      isValidId(data.id) &&
+      isValidId(data.sellerId) &&
+      data.sellerId == request.auth.uid &&
+      data.category is string && data.category.size() >= 1 && data.category.size() <= 60 &&
+      data.maxSingleDiscountPct is number && data.maxSingleDiscountPct >= 0 && data.maxSingleDiscountPct <= 40 &&
+      data.maxBundleDiscountPct is number && data.maxBundleDiscountPct >= 0 && data.maxBundleDiscountPct <= 40 &&
+      data.updatedAt is timestamp;
+    }
+
+    match /categoryNegotiationSettings/{settingId} {
+      allow get: if isValidId(settingId) && resource.data.maxSingleDiscountPct >= 0;
+      allow list: if resource.data.maxSingleDiscountPct >= 0;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(settingId) &&
+        isValidCategoryNegotiationSetting(incoming()) &&
+        incoming().id == settingId &&
+        incoming().sellerId == request.auth.uid &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(settingId) &&
+        isValidCategoryNegotiationSetting(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().sellerId == existing().sellerId &&
+        incoming().category == existing().category &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().sellerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'maxSingleDiscountPct',
+              'maxBundleDiscountPct',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerifiedUser() &&
+        isValidId(settingId) &&
+        (existing().sellerId == request.auth.uid || isAdmin());
+    }
+  }
+}
