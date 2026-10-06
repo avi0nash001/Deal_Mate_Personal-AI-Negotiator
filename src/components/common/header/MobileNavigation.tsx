@@ -118,8 +118,8 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
     },
     {
       id: 'ai_shopping',
-      label: 'AI Discovery',
-      icon: <Sparkles className="w-4 h-4 text-blue-500" />,
+      label: 'AI Deal Analyzer',
+      icon: <ShieldCheck className="w-4 h-4 text-blue-500" />,
     },
     {
       id: 'orders',

@@ -3,6 +3,7 @@ import {
   Compass,
   Zap,
   Sparkles,
+  ShieldCheck,
   ShoppingBag,
   Store,
   BarChart3,
@@ -84,8 +85,8 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
     },
     {
       id: 'ai_shopping',
-      label: 'AI Discovery',
-      icon: <Sparkles className="w-3.5 h-3.5 shrink-0" />,
+      label: 'AI Deal Analyzer',
+      icon: <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-blue-500" />,
     },
     {
       id: 'orders',

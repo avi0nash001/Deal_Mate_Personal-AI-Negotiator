@@ -3,6 +3,7 @@ import { Header, ActiveNavTab } from './components/common/Header';
 import { Footer } from './components/common/Footer';
 import { LandingHero } from './components/landing/LandingHero';
 import { AIShoppingAgent } from './components/ai/AIShoppingAgent';
+import { DealAnalyzerView } from './components/dealAnalyzer/DealAnalyzerView';
 import { CategoriesView } from './components/categories/CategoriesView';
 import { LocalStoresView } from './components/stores/LocalStoresView';
 import { ForBusinessView } from './components/business/ForBusinessView';
@@ -32,7 +33,7 @@ export type IntendedAction =
 export const TAB_PATH_MAP: Record<ActiveNavTab, string> = {
   home: '/overview',
   negotiator: '/negotiator',
-  ai_shopping: '/discovery',
+  ai_shopping: '/analyzer',
   orders: '/orders',
   categories: '/categories',
   stores: '/stores',
@@ -46,7 +47,7 @@ export const getInitialTabFromLocation = (): ActiveNavTab => {
     const path = window.location.pathname.toLowerCase();
     if (path === '/overview' || path === '/') return 'home';
     if (path === '/negotiator' || path === '/negotiation') return 'negotiator';
-    if (path === '/discovery' || path === '/chat' || path === '/dashboard' || path === '/my-deals') return 'ai_shopping';
+    if (path === '/analyzer' || path === '/discovery' || path === '/chat' || path === '/dashboard' || path === '/my-deals') return 'ai_shopping';
     if (path === '/orders' || path === '/my-orders') return 'orders';
     if (path === '/seller' || path === '/shop-owner' || path.startsWith('/shop-owner')) return 'store_owner_portal';
     if (path === '/admin' || path.startsWith('/admin')) return 'admin';
@@ -506,6 +507,11 @@ export default function App() {
   // Initial product passed into AI Negotiator ONLY when user explicitly selects a product from another tab (null by default!)
   const [negotiatorInitialProduct, setNegotiatorInitialProduct] = useState<Product | null>(null);
 
+  // AI Deal Analyzer State (Context preserved from Negotiator or Real-Time Search)
+  const [analyzerProduct, setAnalyzerProduct] = useState<Product | null>(null);
+  const [analyzerNegotiatedPrice, setAnalyzerNegotiatedPrice] = useState<number | undefined>(undefined);
+  const [analyzerTargetBudget, setAnalyzerTargetBudget] = useState<number | undefined>(undefined);
+
   // Active negotiation session state
   const [session, setSession] = useState<NegotiationSession>(() =>
     NegotiationEngine.createSession(
@@ -827,10 +833,10 @@ export default function App() {
         !requireAuth(
           { type: 'AI_DISCOVERY' },
           {
-            title: 'AI Discovery',
-            feature: 'AI Discovery Engine',
+            title: 'AI Deal Analyzer',
+            feature: 'AI Deal Analyzer Engine',
             message:
-              'Sign in to continue. Create your free DealMate account to access AI Discovery, browse real-time store catalogs, and benchmark market prices.',
+              'Sign in to continue. Create your free DealMate account to access AI Deal Analyzer, evaluate real-time product quality, seller trust, and warranty protection.',
           }
         )
       ) {
@@ -1299,38 +1305,20 @@ export default function App() {
           </section>
         )}
 
-        {/* 2. AI SHOPPING AGENT (/chat: Unified Search, Voice Input, Multi-Round Exchange) */}
+        {/* 2. AI DEAL ANALYZER (/analyzer: Real-Time All-Category Quality, Seller & Risk Evaluation) */}
         {currentTab === 'ai_shopping' && (
           <section className="container w-full max-w-full sm:max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto">
-            <AIShoppingAgent
-              products={products}
-              localStores={stores}
-              categorySettings={categorySettings}
-              initialQuery={initialSearchQuery}
-              initialBudget={initialSearchBudget}
-              recentSearches={recentSearches}
-              onNegotiateProduct={handleNegotiateProduct}
-              onBuySettledProduct={handleBuySettledProduct}
-              onCompareToggle={handleToggleCompare}
-              comparedProductIds={comparedProductIds}
-              onSaveToggle={handleToggleSaveProduct}
-              savedProductIds={savedProductIds}
-              onViewStore={() => navigateTab('stores')}
-              onOpenVoiceModal={() => setIsVoiceOpen(true)}
-              onLiveProductsFetched={(liveProds: Product[]) => {
-                setProducts((prev) => {
-                  const map = new Map<string, Product>();
-                  for (const lp of liveProds) {
-                    map.set(lp.id, lp);
-                  }
-                  for (const p of prev) {
-                    if (!map.has(p.id)) {
-                      map.set(p.id, p);
-                    }
-                  }
-                  return Array.from(map.values());
-                });
+            <DealAnalyzerView
+              initialProduct={analyzerProduct || products[0]}
+              initialNegotiatedPrice={analyzerNegotiatedPrice}
+              initialBudget={analyzerTargetBudget}
+              onBuyNow={handleBuySettledProduct}
+              onReNegotiate={(prod, prompt, price) => {
+                setNegotiatorInitialProduct(prod);
+                navigateTab('negotiator');
               }}
+              onBrowseMoreProducts={() => navigateTab('negotiator')}
+              currentThemeId={currentThemeId}
             />
           </section>
         )}
@@ -1389,6 +1377,11 @@ export default function App() {
               initialSelectedProduct={negotiatorInitialProduct}
               onClearInitialProduct={() => setNegotiatorInitialProduct(null)}
               onAcceptDealCheckout={handleBuySettledProduct}
+              onAnalyzeDeal={(product, settledPrice) => {
+                setAnalyzerProduct(product);
+                setAnalyzerNegotiatedPrice(settledPrice);
+                navigateTab('ai_shopping');
+              }}
               onCompareToggle={handleToggleCompare}
               comparedProductIds={comparedProductIds}
               onOpenCompareModal={() => setIsCompareOpen(true)}

@@ -87,6 +87,7 @@ interface StreamlinedNegotiatorProps {
   initialSelectedProduct?: Product | null;
   onClearInitialProduct?: () => void;
   onAcceptDealCheckout?: (product: Product, settledPrice: number) => void;
+  onAnalyzeDeal?: (product: Product, settledPrice: number) => void;
   onCompareToggle?: (product: Product) => void;
   comparedProductIds?: string[];
   onOpenCompareModal?: () => void;
@@ -183,6 +184,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
   initialSelectedProduct = null,
   onClearInitialProduct,
   onAcceptDealCheckout,
+  onAnalyzeDeal,
   onCompareToggle,
   comparedProductIds = [],
   onOpenCompareModal,
@@ -697,6 +699,13 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
           turns,
         },
       }));
+
+      // AUTOMATIC TRANSITION: AI Negotiator -> AI Deal Analyzer (Requirement #1)
+      if (onAnalyzeDeal) {
+        setTimeout(() => {
+          onAnalyzeDeal(product, settledPrice);
+        }, 1200);
+      }
     }, 650);
   };
 
@@ -3343,6 +3352,11 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
               const price = sessionState.activeNegotiation?.settledPrice || prod?.listPrice;
               if (onAcceptDealCheckout && prod && price) {
                 onAcceptDealCheckout(prod, price);
+              }
+            }}
+            onAnalyzeDeal={(prod, price) => {
+              if (onAnalyzeDeal) {
+                onAnalyzeDeal(prod, price);
               }
             }}
             onFindAlternatives={handleFindAlternatives}

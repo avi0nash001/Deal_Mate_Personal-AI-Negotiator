@@ -6,6 +6,7 @@ import {
   CategoryNegotiationSetting,
 } from '../../types';
 import { RecommendationEngine } from '../../services/recommendationEngine';
+import { PriceSparkline } from '../common/PriceSparkline';
 import {
   ArrowRight,
   Bot,
@@ -433,12 +434,15 @@ const ProductResultCard: React.FC<{
           <span>{money(product.marketPrice)}</span>
           {delta <= 0 ? <em className="good">Within budget</em> : <em className="warn">{money(delta)} above</em>}
         </div>
+        <div className="my-1">
+          <PriceSparkline product={product} height={24} showLabels={false} />
+        </div>
         <div className="dm-specs">
           {Object.entries(product.specs).slice(0, 3).map(([key, value]) => <span key={key}><Check className="h-3 w-3" /> {key}: {value}</span>)}
         </div>
         <div className="dm-card-actions">
           <button onClick={onSelect}>View details</button>
-          <button className="primary" onClick={onNegotiate}><Zap className="h-3.5 w-3.5" /> Negotiate</button>
+          <button className="primary" onClick={onNegotiate}><Zap className="h-3.5 w-3.5" /> Select & Negotiate</button>
         </div>
       </div>
     </article>

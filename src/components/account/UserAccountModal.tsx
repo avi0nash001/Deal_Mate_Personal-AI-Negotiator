@@ -343,7 +343,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                         ? 'Full access to Admin Dashboard, user & shop governance, reported products, and platform settings.'
                         : currentUser.role === 'store_owner'
                         ? 'Authorized to manage your own store inventory, respond to incoming negotiations, and configure floor discounts.'
-                        : 'Authorized to access AI Discovery, start AI Negotiator sessions, compare products, and manage your personal orders.'}
+                        : 'Authorized to access AI Deal Analyzer, start AI Negotiator sessions, compare products, and manage your personal orders.'}
                     </p>
                   </div>
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold shrink-0">

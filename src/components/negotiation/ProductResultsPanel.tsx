@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../../types';
 import { ThemeConfig } from '../../types/theme';
+import { PriceSparkline } from '../common/PriceSparkline';
 import {
   DealHunterProductCandidate,
   NegotiationWorkspaceData,
@@ -57,6 +58,8 @@ interface ProductResultsPanelProps {
   onTryAgain?: () => void;
   onAcceptDeal?: () => void;
   onFindAlternatives?: () => void;
+  onOptimizeDeal?: (product: Product, settledPrice: number) => void;
+  onAnalyzeDeal?: (product: Product, settledPrice: number) => void;
   onBackToDiscovery?: () => void;
   onBackToActiveDeal?: () => void;
   onSelectAlternative?: (candidate: DealHunterProductCandidate) => void;
@@ -93,6 +96,8 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
   onTryAgain,
   onAcceptDeal,
   onFindAlternatives,
+  onOptimizeDeal,
+  onAnalyzeDeal,
   onBackToDiscovery,
   onBackToActiveDeal,
   onSelectAlternative,
@@ -565,12 +570,48 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
               <>
                 <button
                   type="button"
-                  onClick={onAcceptDeal}
-                  className="w-full py-3 px-4 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition-transform active:scale-[0.98]"
-                  style={{ backgroundColor: 'var(--success)' }}
+                  onClick={() => {
+                    if (onAnalyzeDeal && currentActiveProduct) {
+                      onAnalyzeDeal(currentActiveProduct, settledPrice);
+                    } else if (onOptimizeDeal && currentActiveProduct) {
+                      onOptimizeDeal(currentActiveProduct, settledPrice);
+                    } else if (onAcceptDeal) {
+                      onAcceptDeal();
+                    }
+                  }}
+                  className="w-full py-3 px-4 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition-transform active:scale-[0.98] bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Accept Deal & Proceed (₹{settledPrice.toLocaleString('en-IN')})</span>
+                  <span>🔬 Run AI Deal Analyzer (Quality, Seller & Risk Evaluation)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOptimizeDeal && currentActiveProduct) {
+                      onOptimizeDeal(currentActiveProduct, settledPrice);
+                    } else if (onAcceptDeal) {
+                      onAcceptDeal();
+                    }
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition-transform active:scale-[0.98] bg-linear-to-r from-emerald-600 via-teal-600 to-blue-600"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>⚡ Deal Optimizer (Live Coupons & Bank Concessions)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onAcceptDeal}
+                  className="w-full py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Direct Checkout at Negotiated Price (₹{settledPrice.toLocaleString('en-IN')})</span>
                 </button>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -1070,8 +1111,13 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
           </div>
         </div>
 
+        {/* 30-Day Price Trend Sparkline Chart */}
+        <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+          <PriceSparkline product={p} height={26} showLabels={false} />
+        </div>
+
         {/* Key Specifications Bullet Points */}
-        <div className="mt-2.5 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+        <div className="mt-2 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
           <div className="flex flex-wrap gap-1.5 text-[11px]">
             {bulletSpecs.map((spec, sIdx) => (
               <span
@@ -1179,7 +1225,7 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
                 style={{ backgroundColor: 'var(--accent)' }}
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>🤝 Negotiate</span>
+                <span>⚡ Select & Negotiate</span>
               </button>
             )}
           </div>

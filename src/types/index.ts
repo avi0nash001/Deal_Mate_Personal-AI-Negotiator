@@ -59,7 +59,10 @@ export interface Product {
   isLiveGoogleSearch?: boolean;
   searchSourceTitle?: string;
   fetchedAt?: string;
+  priceHistory?: Array<{ date: string; price: number }>;
 }
+
+export * from './coupon';
 
 export interface CategoryNegotiationSetting {
   id: string;

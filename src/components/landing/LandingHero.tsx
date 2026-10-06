@@ -737,11 +737,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                 theme.isLight ? 'text-slate-900' : 'text-white'
               }`}
             >
-              AI Discovery & AI Negotiator Features
+              AI Negotiator & AI Deal Analyzer
             </h2>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md">
-            Explore DealMate's dual AI engines: discover and compare products across the web in real-time, then autonomously negotiate exclusive deals down to the merchant floor.
+            Explore DealMate's end-to-end intelligence: autonomously negotiate prices with seller agents, then independently verify quality, seller trust, warranties, and risks before buying.
           </p>
         </div>
 
@@ -852,8 +852,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
               onClick={onExploreMarketplace}
               className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-display font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>Explore AI Discovery</span>
+              <ShieldCheck className="w-4 h-4" />
+              <span>Explore AI Deal Analyzer</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

@@ -756,7 +756,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
               </div>
               <p className="text-xs text-blue-700 leading-relaxed">
                 {authGateContext.message ||
-                  'Create your free DealMate account or sign in to access AI Discovery, Live Search, and AI Negotiation.'}
+                  'Create your free DealMate account or sign in to access AI Deal Analyzer, Live Search, and AI Negotiation.'}
               </p>
               <div className="text-[11px] font-mono text-blue-600 font-medium pt-0.5">
                 ⚡ Once authenticated, your intended action will automatically continue.

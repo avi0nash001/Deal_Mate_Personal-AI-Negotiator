@@ -299,15 +299,15 @@ export const Header: React.FC<HeaderProps> = ({
                         : 'hover:bg-white/5 text-slate-200'
                     }`}
                   >
-                    <Sparkles className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                    <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                     <div>
-                      <div className="font-medium">Live Price Discovery</div>
+                      <div className="font-medium">AI Deal Analyzer</div>
                       <div
                         className={`text-[11px] ${
                           currentTheme.isLight ? 'text-slate-500' : 'text-slate-400'
                         }`}
                       >
-                        Compare Amazon, Flipkart & Store QR
+                        Quality, seller & risk verification ready
                       </div>
                     </div>
                   </button>
