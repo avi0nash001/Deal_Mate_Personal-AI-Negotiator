@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Zap, Bell, Bookmark, Layers, Sparkles, TrendingDown } from 'lucide-react';
+import { Zap, Bell, Bookmark, Layers, Sparkles, TrendingDown, ShieldCheck } from 'lucide-react';
 import { soundEffects } from '../../services/soundEffects';
 import { ThemeId, THEMES } from '../../types/theme';
 import { AppUser } from '../../types';
@@ -104,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({
             onNavigate('home');
           }}
           aria-label="DealMate Home"
-          className="flex items-center gap-2.5 text-left cursor-pointer group shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="flex items-center gap-2.5 text-left cursor-pointer group shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 z-10"
         >
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 shrink-0"
@@ -114,9 +114,9 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Zap className="w-4 h-4 text-white fill-current" />
           </div>
-          <div className="leading-none">
+          <div className="leading-none shrink-0">
             <span
-              className={`font-display font-extrabold text-lg xl:text-xl tracking-tight transition-colors ${
+              className={`font-display font-extrabold text-lg xl:text-xl tracking-tight transition-colors whitespace-nowrap ${
                 currentTheme.isLight
                   ? 'text-slate-900 group-hover:text-blue-600'
                   : 'text-white group-hover:text-blue-400'
@@ -141,8 +141,8 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* 3. Essential Utility Controls (Right - Desktop & Tablet >= 768px) */}
         <div className="hidden md:flex items-center gap-1.5 lg:gap-2 shrink-0">
-          {/* Quick Access Contextual Menu (xl+ only to keep laptop header clean) */}
-          <div className="hidden xl:block">
+          {/* Quick Access Contextual Menu (visible on right side) */}
+          <div className="hidden lg:block">
             <QuickAccessMenu
               currentTab={currentTab}
               onNavigate={onNavigate}

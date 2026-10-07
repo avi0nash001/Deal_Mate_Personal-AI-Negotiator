@@ -7,6 +7,8 @@ import {
   NegotiationAuditRecord,
   IncomingNegotiationRequest,
   ReportedProductItem,
+  BulkDiscountTier,
+  CollectiveDealPool,
 } from '../types';
 
 import earbudsImg from '../assets/images/dealmate_earbuds_1790325700521.jpg';
@@ -1580,6 +1582,114 @@ export const INITIAL_NEGOTIATION_RECORDS: NegotiationAuditRecord[] = [
     savedAmount: 600,
     status: 'DEAL_ACCEPTED',
     createdAt: '2026-09-25T17:30:00Z',
+  },
+];
+
+/**
+ * Advanced Negotiation System 2.0:
+ * Standard Volume Bulk Discount Tiers for Merchants & Store Owners
+ */
+export const DEFAULT_BULK_DISCOUNT_TIERS: BulkDiscountTier[] = [
+  { minQty: 1, maxQty: 2, discountPct: 4, label: '1–2 units (0–5% baseline)' },
+  { minQty: 3, maxQty: 5, discountPct: 7, label: '3–5 units (5–8% volume tier)' },
+  { minQty: 6, maxQty: 10, discountPct: 10, label: '6–10 units (8–12% wholesale tier)' },
+  { minQty: 11, maxQty: 25, discountPct: 14, label: '11–25 units (12–15% commercial tier)' },
+  { minQty: 26, discountPct: 18, label: '25+ units (Enterprise / Custom margin)' },
+];
+
+/**
+ * Advanced Negotiation System 2.0:
+ * Initial Pre-seeded Active Collective Deal Pools (Demand Pooling / Group Buy)
+ */
+export const INITIAL_COLLECTIVE_POOLS: CollectiveDealPool[] = [
+  {
+    id: 'pool_boat_141',
+    productId: 'amz_boat_airdopes_141',
+    productName: 'boAt Airdopes 141 ANC True Wireless Earbuds',
+    productImage: earbudsImg,
+    category: 'Electronics',
+    sellerId: 'amazon_india_api',
+    sellerName: 'boAt Official Store (Amazon)',
+    listPrice: 1499,
+    individualSettledPrice: 1449,
+    collectiveTargetPrice: 1299,
+    targetQuantity: 20,
+    currentQuantity: 14,
+    participantsCount: 8,
+    status: 'ACTIVE',
+    expiresAt: Date.now() + 5 * 3600 * 1000 + 42 * 60 * 1000, // 5h 42m
+    probabilityScore: 88,
+    sellerBenefitSummary:
+      'Guaranteed 20-unit dispatch batch, reduced per-unit logistics overhead, zero advertising spend.',
+    inventoryAvailable: 140,
+    createdAt: Date.now() - 3600 * 1000 * 18,
+    participants: [
+      { userId: 'usr_p1', userName: 'Kabir Mehta', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 12 },
+      { userId: 'usr_p2', userName: 'Ananya Roy', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 10 },
+      { userId: 'usr_p3', userName: 'Devendra S.', pledgedQty: 3, pledgedAt: Date.now() - 3600 * 1000 * 7 },
+      { userId: 'usr_p4', userName: 'Pooja Iyer', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 5 },
+      { userId: 'usr_p5', userName: 'Mohit Chawla', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 4 },
+      { userId: 'usr_p6', userName: 'Shruti V.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 3 },
+      { userId: 'usr_p7', userName: 'Tanya Bansal', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 2 },
+      { userId: 'usr_p8', userName: 'Karan J.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 1 },
+    ],
+  },
+  {
+    id: 'pool_sonicpulse_01',
+    productId: 'prod_earbuds_01',
+    productName: 'SonicPulse Pro ANC Wireless Earbuds',
+    productImage: earbudsImg,
+    category: 'Electronics',
+    sellerId: 'store_owner_apex_02',
+    sellerName: 'Apex Sound & Tech Direct',
+    listPrice: 2999,
+    individualSettledPrice: 2499,
+    collectiveTargetPrice: 2199,
+    targetQuantity: 15,
+    currentQuantity: 11,
+    participantsCount: 6,
+    status: 'ACTIVE',
+    expiresAt: Date.now() + 8 * 3600 * 1000,
+    probabilityScore: 82,
+    sellerBenefitSummary:
+      'Direct warehouse bulk pallet clearance, zero single-item return overhead.',
+    inventoryAvailable: 85,
+    createdAt: Date.now() - 3600 * 1000 * 14,
+    participants: [
+      { userId: 'usr_sp1', userName: 'Nikhil R.', pledgedQty: 3, pledgedAt: Date.now() - 3600 * 1000 * 8 },
+      { userId: 'usr_sp2', userName: 'Zoya Khan', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 6 },
+      { userId: 'usr_sp3', userName: 'Arjun P.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 4 },
+      { userId: 'usr_sp4', userName: 'Ritika M.', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 3 },
+      { userId: 'usr_sp5', userName: 'Vikram S.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 2 },
+      { userId: 'usr_sp6', userName: 'Gaurav B.', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 1 },
+    ],
+  },
+  {
+    id: 'pool_sneakers_01',
+    productId: 'prod_sneakers_01',
+    productName: 'NovaGlide Campus Casual Low-Top Sneakers',
+    productImage: sneakersImg,
+    category: 'Footwear',
+    sellerId: 'store_owner_kicks_03',
+    sellerName: 'SoleCraft & Kicks Hub',
+    listPrice: 2499,
+    individualSettledPrice: 2099,
+    collectiveTargetPrice: 1799,
+    targetQuantity: 25,
+    currentQuantity: 19,
+    participantsCount: 12,
+    status: 'ACTIVE',
+    expiresAt: Date.now() + 11 * 3600 * 1000,
+    probabilityScore: 91,
+    sellerBenefitSummary:
+      'Campus batch delivery, single pickup point, clearance of seasonal inventory run.',
+    inventoryAvailable: 95,
+    createdAt: Date.now() - 3600 * 1000 * 20,
+    participants: [
+      { userId: 'usr_sn1', userName: 'Sameer K.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 15 },
+      { userId: 'usr_sn2', userName: 'Pooja T.', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 12 },
+      { userId: 'usr_sn3', userName: 'Harshita D.', pledgedQty: 3, pledgedAt: Date.now() - 3600 * 1000 * 9 },
+    ],
   },
 ];
 

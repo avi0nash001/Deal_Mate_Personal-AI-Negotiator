@@ -60,9 +60,51 @@ export interface Product {
   searchSourceTitle?: string;
   fetchedAt?: string;
   priceHistory?: Array<{ date: string; price: number }>;
+  bulkDiscountTiers?: BulkDiscountTier[];
 }
 
 export * from './coupon';
+
+export interface BulkDiscountTier {
+  minQty: number;
+  maxQty?: number;
+  discountPct: number;
+  label: string;
+  isCustomNegotiation?: boolean;
+}
+
+export interface CollectiveDealParticipant {
+  userId: string;
+  userName: string;
+  userEmail?: string;
+  pledgedQty: number;
+  pledgedAt: number;
+}
+
+export interface CollectiveDealPool {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  category: string;
+  sellerId: string;
+  sellerName: string;
+  listPrice: number;
+  individualSettledPrice: number;
+  collectiveTargetPrice: number;
+  targetQuantity: number;
+  currentQuantity: number;
+  participantsCount: number;
+  participants: CollectiveDealParticipant[];
+  status: 'FORMING' | 'ACTIVE' | 'UNLOCKED' | 'EXPIRED';
+  expiresAt: number;
+  probabilityScore: number;
+  sellerBenefitSummary: string;
+  inventoryAvailable: number;
+  createdAt: number;
+}
+
+export type NegotiationMode = 'INDIVIDUAL' | 'BULK' | 'COLLECTIVE';
 
 export interface CategoryNegotiationSetting {
   id: string;
@@ -70,6 +112,7 @@ export interface CategoryNegotiationSetting {
   category: string;
   maxSingleDiscountPct: number; // 0-40, default 15
   maxBundleDiscountPct: number; // 0-40, default 20
+  bulkTiers?: BulkDiscountTier[];
 }
 
 export interface NegotiationExchangeTurn {
@@ -255,6 +298,10 @@ export interface NegotiationSession {
   createdAt: number;
   expiresAt: number;
   token?: string;
+  negotiationMode?: NegotiationMode;
+  quantity?: number;
+  bulkTierApplied?: BulkDiscountTier;
+  collectivePoolId?: string;
 }
 
 export interface DealToken {

@@ -1,4 +1,11 @@
-import { Product, CategoryNegotiationSetting, NegotiationExchangeTurn } from '../types';
+import {
+  Product,
+  CategoryNegotiationSetting,
+  NegotiationExchangeTurn,
+  BulkDiscountTier,
+  CollectiveDealPool,
+  NegotiationMode,
+} from '../types';
 import {
   resolveCategorySetting,
   priceFloor,
@@ -138,6 +145,12 @@ export interface NegotiationWorkspaceData {
   turns: NegotiationExchangeTurn[];
   quantity: number;
   bundleSuggestion?: string;
+  mode?: NegotiationMode;
+  bulkTier?: BulkDiscountTier;
+  bulkTotal?: number;
+  bulkSavings?: number;
+  collectivePool?: CollectiveDealPool;
+  totalPaid?: number;
 }
 
 export type FollowUpIntentType =

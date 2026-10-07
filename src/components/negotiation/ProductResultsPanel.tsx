@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { Product } from '../../types';
+import {
+  Product,
+  CollectiveDealPool,
+  CategoryNegotiationSetting,
+  BulkDiscountTier,
+} from '../../types';
 import { ThemeConfig } from '../../types/theme';
 import { PriceSparkline } from '../common/PriceSparkline';
 import {
   DealHunterProductCandidate,
   NegotiationWorkspaceData,
 } from '../../services/multiAgentPipeline';
+import { NegotiationEngine } from '../../services/negotiationEngine';
+import { INITIAL_COLLECTIVE_POOLS, DEFAULT_BULK_DISCOUNT_TIERS } from '../../data/catalog';
 import {
   Star,
   Zap,
@@ -24,6 +31,11 @@ import {
   CheckCircle2,
   Loader2,
   Tag,
+  Package,
+  Users,
+  Minus,
+  Plus,
+  TrendingUp,
 } from 'lucide-react';
 
 export type ProductSortOption = 'best_match' | 'lowest_price' | 'highest_rating' | 'best_deal';
@@ -71,6 +83,12 @@ interface ProductResultsPanelProps {
   comparedProductIds?: string[];
   onToggleCompare?: (product: Product) => void;
   onOpenCompareModal?: () => void;
+  quantity?: number;
+  onChangeQuantity?: (qty: number) => void;
+  onStartBulkNegotiate?: (candidate: DealHunterProductCandidate, qty: number) => void;
+  onJoinCollectiveDeal?: (pool: CollectiveDealPool) => void;
+  activeCollectivePools?: CollectiveDealPool[];
+  categorySettings?: CategoryNegotiationSetting[];
 }
 
 export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
@@ -109,6 +127,12 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
   comparedProductIds = [],
   onToggleCompare,
   onOpenCompareModal,
+  quantity = 1,
+  onChangeQuantity,
+  onStartBulkNegotiate,
+  onJoinCollectiveDeal,
+  activeCollectivePools = INITIAL_COLLECTIVE_POOLS,
+  categorySettings = [],
 }) => {
   const [expandedDetailsId, setExpandedDetailsId] = useState<string | null>(null);
 
@@ -394,6 +418,55 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
               </div>
             </div>
 
+            {/* ADVANCED NEGOTIATION 2.0: Order Quantity & Mode Selector */}
+            <div className="pt-2 border-t flex flex-wrap items-center justify-between gap-2" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  Units:
+                </span>
+                <div className="flex items-center rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+                  <button
+                    type="button"
+                    onClick={() => onChangeQuantity && onChangeQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1}
+                    className="px-2 py-0.5 text-xs font-bold hover:bg-slate-500/10 disabled:opacity-40 cursor-pointer"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    -
+                  </button>
+                  <span className="px-2.5 py-0.5 font-mono text-xs font-bold" style={{ color: 'var(--accent)' }}>
+                    {quantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onChangeQuantity && onChangeQuantity(quantity + 1)}
+                    className="px-2 py-0.5 text-xs font-bold hover:bg-slate-500/10 cursor-pointer"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick volume chips */}
+              <div className="flex items-center gap-1 text-[10px] font-mono">
+                {[1, 3, 5, 10, 25].map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => onChangeQuantity && onChangeQuantity(q)}
+                    className={`px-2 py-0.5 rounded-md border font-semibold cursor-pointer transition-colors ${
+                      quantity === q
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-slate-300 dark:border-slate-700 hover:bg-slate-500/10'
+                    }`}
+                  >
+                    {q === 1 ? '1 unit' : `${q}u (Bulk)`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Bullet Specifications */}
             <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
               <div className="flex flex-wrap gap-1.5 text-xs">
@@ -613,6 +686,110 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                   <span>Direct Checkout at Negotiated Price (₹{settledPrice.toLocaleString('en-IN')})</span>
                 </button>
+
+                {/* ADVANCED NEGOTIATION SYSTEM 2.0: Mode 2 Bulk & Mode 3 Collective Options */}
+                {(() => {
+                  const qty = quantity >= 3 ? quantity : 10;
+                  const currentNormalTotal = settledPrice * qty;
+                  const bulkUnitPrice = NegotiationEngine.computeBulkUnitPrice(currentActiveProduct.listPrice, qty, currentActiveProduct, categorySettings);
+                  const bulkTotal = bulkUnitPrice * qty;
+                  const bulkSavings = Math.max(0, currentNormalTotal - bulkTotal);
+
+                  return (
+                    <div className="p-3 rounded-2xl border border-indigo-500/40 bg-gradient-to-r from-indigo-950/30 via-slate-900/40 to-slate-950/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Package className="w-3.5 h-3.5" /> Bulk Purchase ({qty} units)
+                        </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          Volume Tier
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                        &ldquo;You&apos;re already close to my best individual price. Because you&apos;re purchasing {qty} units, I can try a bulk negotiation with the seller.&rdquo;
+                      </p>
+                      <div className="grid grid-cols-3 gap-1.5 text-center text-xs font-mono">
+                        <div className="p-1.5 rounded-xl bg-slate-900/60 border border-slate-800">
+                          <div className="text-[10px] text-slate-400">Current Total</div>
+                          <div className="font-bold text-slate-200">₹{currentNormalTotal.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div className="p-1.5 rounded-xl bg-indigo-950/40 border border-indigo-700/50">
+                          <div className="text-[10px] text-indigo-300">Bulk Target</div>
+                          <div className="font-bold text-indigo-400">₹{bulkTotal.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div className="p-1.5 rounded-xl bg-emerald-950/40 border border-emerald-700/50">
+                          <div className="text-[10px] text-emerald-300">Potential Saving</div>
+                          <div className="font-bold text-emerald-400">₹{bulkSavings.toLocaleString('en-IN')}</div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onStartBulkNegotiate && activeCandidate) {
+                            onStartBulkNegotiate(activeCandidate, qty);
+                          } else if (onStartNegotiate && activeCandidate) {
+                            onStartNegotiate(activeCandidate);
+                          }
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-transform active:scale-[0.98]"
+                      >
+                        <Package className="w-3.5 h-3.5" />
+                        <span>[ Start Bulk Negotiation ]</span>
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {(() => {
+                  const matchedPool =
+                    activeCollectivePools.find(
+                      (p) =>
+                        (p.productId === currentActiveProduct.id || p.productName.toLowerCase() === currentActiveProduct.name.toLowerCase()) &&
+                        p.status === 'ACTIVE'
+                    ) ||
+                    activeCollectivePools.find((p) => p.category === currentActiveProduct.category && p.status === 'ACTIVE');
+
+                  if (!matchedPool) return null;
+                  const pctReached = Math.min(100, Math.round((matchedPool.currentQuantity / matchedPool.targetQuantity) * 100));
+
+                  return (
+                    <div className="p-3 rounded-2xl border border-purple-500/40 bg-gradient-to-r from-purple-950/30 via-slate-900/40 to-slate-950/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" /> Collective Deal (Group Buy)
+                        </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          {matchedPool.participantsCount} Buyers Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                        &ldquo;You&apos;ve reached the maximum reasonable individual negotiation. Pool demand with {matchedPool.participantsCount} other buyers to unlock wholesale pricing at ₹{matchedPool.collectiveTargetPrice.toLocaleString('en-IN')}/unit!&rdquo;
+                      </p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                          <span>Pledged: {matchedPool.currentQuantity} / {matchedPool.targetQuantity} units</span>
+                          <span className="text-purple-300 font-bold">{pctReached}% ({matchedPool.probabilityScore}% Probability)</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all"
+                            style={{ width: `${pctReached}%` }}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onJoinCollectiveDeal) onJoinCollectiveDeal(matchedPool);
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-transform active:scale-[0.98]"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>[ Join Collective Pool — Lock ₹{matchedPool.collectiveTargetPrice.toLocaleString('en-IN')} ]</span>
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -1167,6 +1344,48 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
           </div>
         )}
 
+        {/* ADVANCED NEGOTIATION 2.0: Matched Collective Group Buy Pool Badge */}
+        {(() => {
+          const matchedPool = activeCollectivePools.find(
+            (pool) =>
+              (pool.productId === p.id ||
+                pool.productName.toLowerCase().includes(p.name.toLowerCase().slice(0, 14))) &&
+              pool.status === 'ACTIVE'
+          );
+          if (!matchedPool) return null;
+          return (
+            <div
+              className="mt-2.5 p-2 rounded-xl border flex items-center justify-between gap-2"
+              style={{
+                backgroundColor: 'rgba(147, 51, 234, 0.08)',
+                borderColor: 'rgba(147, 51, 234, 0.3)',
+              }}
+            >
+              <div className="flex items-center gap-1.5 min-w-0 text-xs">
+                <Users className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                <span className="truncate text-[11px] font-mono" style={{ color: 'var(--text-primary)' }}>
+                  Group Pool: <strong>{matchedPool.currentQuantity}/{matchedPool.targetQuantity}</strong> units •{' '}
+                  <strong className="text-purple-600 dark:text-purple-400">
+                    ₹{matchedPool.collectiveTargetPrice.toLocaleString('en-IN')}
+                  </strong>
+                </span>
+              </div>
+              {onJoinCollectiveDeal && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onJoinCollectiveDeal(matchedPool);
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-mono text-[10px] font-bold shrink-0 cursor-pointer shadow-xs"
+                >
+                  Join Pool
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Card Action Buttons */}
         <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
           <button
@@ -1214,6 +1433,22 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
                 <span>View Retailer</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
+            ) : quantity >= 3 ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onStartBulkNegotiate) {
+                    onStartBulkNegotiate(cand, quantity);
+                  } else {
+                    onStartNegotiate(cand);
+                  }
+                }}
+                className="px-3.5 py-1.5 rounded-xl text-white font-display font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs bg-indigo-600 hover:bg-indigo-500"
+              >
+                <Package className="w-3.5 h-3.5" />
+                <span>⚡ Bulk Negotiate ({quantity}u)</span>
+              </button>
             ) : (
               <button
                 type="button"

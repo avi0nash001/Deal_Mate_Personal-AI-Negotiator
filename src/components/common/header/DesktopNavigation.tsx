@@ -70,6 +70,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
   const userPrimaryItems: Array<{
     id: ActiveNavTab;
     label: string;
+    shortLabel?: string;
     icon: React.ReactNode;
     badgeCount?: number;
   }> = [
@@ -81,11 +82,13 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
     {
       id: 'negotiator',
       label: 'AI Negotiator',
+      shortLabel: 'Negotiate',
       icon: <Zap className="w-3.5 h-3.5 shrink-0" />,
     },
     {
       id: 'ai_shopping',
       label: 'AI Deal Analyzer',
+      shortLabel: 'Deal Analyzer',
       icon: <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-blue-500" />,
     },
     {
@@ -101,6 +104,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
   const shopOwnerPrimaryItems: Array<{
     id: ActiveNavTab;
     label: string;
+    shortLabel?: string;
     icon: React.ReactNode;
     badgeCount?: number;
   }> = [
@@ -122,6 +126,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
     {
       id: 'negotiator',
       label: 'Negotiations',
+      shortLabel: 'Deals',
       icon: <ArrowUpDown className="w-3.5 h-3.5 shrink-0 text-blue-500" />,
     },
     {
@@ -133,10 +138,11 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
   ];
 
   // 3. ADMIN NAVIGATION (Section 14)
-  // Overview, Admin Dashboard, Users, Shop Owners, Products, Negotiations, Analytics
+  // Overview, Admin Console, Products, Negotiations
   const adminPrimaryItems: Array<{
     id: ActiveNavTab;
     label: string;
+    shortLabel?: string;
     icon: React.ReactNode;
     badgeCount?: number;
   }> = [
@@ -147,18 +153,8 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
     },
     {
       id: 'admin',
-      label: 'Admin Dashboard',
+      label: 'Admin Console',
       icon: <BarChart3 className="w-3.5 h-3.5 shrink-0 text-amber-500" />,
-    },
-    {
-      id: 'admin',
-      label: 'Users',
-      icon: <Users className="w-3.5 h-3.5 shrink-0 text-blue-500" />,
-    },
-    {
-      id: 'admin',
-      label: 'Shop Owners',
-      icon: <Store className="w-3.5 h-3.5 shrink-0 text-emerald-500" />,
     },
     {
       id: 'categories',
@@ -168,12 +164,8 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
     {
       id: 'negotiator',
       label: 'Negotiations',
+      shortLabel: 'Deals',
       icon: <ArrowUpDown className="w-3.5 h-3.5 shrink-0 text-cyan-500" />,
-    },
-    {
-      id: 'admin',
-      label: 'Analytics',
-      icon: <LineChart className="w-3.5 h-3.5 shrink-0 text-rose-500" />,
     },
   ];
 
@@ -246,7 +238,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
   return (
     <nav
       aria-label="Primary Navigation"
-      className={`hidden md:flex items-center gap-1 lg:gap-1.5 p-1 rounded-2xl border transition-all shadow-xs ${
+      className={`hidden md:flex items-center gap-0.5 lg:gap-1 p-0.5 sm:p-1 rounded-2xl border transition-all shadow-xs max-w-full overflow-x-auto no-scrollbar shrink-0 ${
         currentTheme.isLight
           ? 'bg-slate-100/90 border-slate-200/90'
           : 'bg-[#141922]/90 border-slate-800'
@@ -263,7 +255,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
               onNavigate(item.id);
             }}
             aria-current={isActive ? 'page' : undefined}
-            className={`group relative px-3 py-1.5 rounded-xl text-xs lg:text-[13px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+            className={`group relative px-2 sm:px-2.5 xl:px-2.5 2xl:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 lg:gap-1.5 cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
               isActive
                 ? currentTheme.isLight
                   ? 'text-blue-700 font-bold bg-white border border-blue-200/90 shadow-xs ring-1 ring-blue-500/20'
@@ -289,7 +281,16 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
             </span>
 
             {/* Label */}
-            <span className="tracking-tight">{item.label}</span>
+            <span className="tracking-tight">
+              {item.shortLabel ? (
+                <>
+                  <span className="hidden 2xl:inline">{item.label}</span>
+                  <span className="inline 2xl:hidden">{item.shortLabel}</span>
+                </>
+              ) : (
+                item.label
+              )}
+            </span>
 
             {/* Orders or alerts Badge */}
             {item.badgeCount !== undefined && item.badgeCount > 0 && (
@@ -311,7 +312,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
             {/* Clear Bottom Active Indicator Bar (Section 1) */}
             {isActive && (
               <span
-                className={`absolute -bottom-1 left-2.5 right-2.5 h-0.5 rounded-full ${
+                className={`absolute -bottom-1 left-2 right-2 h-0.5 rounded-full ${
                   currentTheme.isLight
                     ? 'bg-blue-600 shadow-xs'
                     : 'bg-cyan-400 shadow-sm shadow-cyan-400/50'
@@ -333,7 +334,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
           aria-expanded={isMoreOpen}
           aria-haspopup="menu"
           aria-label="More navigation sections"
-          className={`relative px-3 py-1.5 rounded-xl text-xs lg:text-[13px] font-semibold transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+          className={`relative px-2 sm:px-2.5 xl:px-2.5 2xl:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
             isMoreActive || isMoreOpen
               ? currentTheme.isLight
                 ? 'text-blue-700 font-bold bg-white border border-blue-200/90 shadow-xs ring-1 ring-blue-500/20'

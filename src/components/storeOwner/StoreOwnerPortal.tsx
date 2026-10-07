@@ -25,6 +25,13 @@ import {
   Phone,
   Briefcase,
   Lock,
+  Users,
+  Flame,
+  Percent,
+  TrendingUp,
+  Layers,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   AppUser,
@@ -34,8 +41,15 @@ import {
   CategoryNegotiationSetting,
   IncomingNegotiationRequest,
   Order,
+  BulkDiscountTier,
+  CollectiveDealPool,
 } from '../../types';
-import { PRESEEDED_QR_PRODUCTS, INITIAL_INCOMING_NEGOTIATIONS } from '../../data/catalog';
+import {
+  PRESEEDED_QR_PRODUCTS,
+  INITIAL_INCOMING_NEGOTIATIONS,
+  DEFAULT_BULK_DISCOUNT_TIERS,
+  INITIAL_COLLECTIVE_POOLS,
+} from '../../data/catalog';
 import {
   priceFloor,
   MAX_SINGLE_ITEM_DISCOUNT,
@@ -240,6 +254,14 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
   );
 
   const [savedRangeCategory, setSavedRangeCategory] = useState<string | null>(null);
+  const [selectedBulkCategory, setSelectedBulkCategory] = useState<string>(
+    sellerCategories[0] || 'Electronics'
+  );
+  const [editingBulkTiers, setEditingBulkTiers] = useState<BulkDiscountTier[]>(
+    DEFAULT_BULK_DISCOUNT_TIERS
+  );
+  const [savedBulkTiersMsg, setSavedBulkTiersMsg] = useState<string | null>(null);
+  const [authorizedPoolIds, setAuthorizedPoolIds] = useState<Record<string, boolean>>({});
 
   const getCategoryRange = (category: string) => {
     const found = categorySettings.find(
@@ -250,13 +272,20 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
     return {
       maxSingleDiscountPct: found?.maxSingleDiscountPct ?? MAX_SINGLE_ITEM_DISCOUNT,
       maxBundleDiscountPct: found?.maxBundleDiscountPct ?? MAX_BUNDLE_DISCOUNT,
+      bulkTiers: found?.bulkTiers ?? DEFAULT_BULK_DISCOUNT_TIERS,
     };
   };
+
+  useEffect(() => {
+    const range = getCategoryRange(selectedBulkCategory);
+    setEditingBulkTiers(range.bulkTiers || DEFAULT_BULK_DISCOUNT_TIERS);
+  }, [selectedBulkCategory, categorySettings]);
 
   const handleSaveCategoryRange = async (
     category: string,
     singlePct: number,
-    bundlePct: number
+    bundlePct: number,
+    customBulkTiers?: BulkDiscountTier[]
   ) => {
     const clampedSingle = Math.max(0, Math.min(40, Math.round(Number(singlePct) || 0)));
     const clampedBundle = Math.max(0, Math.min(40, Math.round(Number(bundlePct) || 0)));
@@ -266,12 +295,15 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
     const cleanCat = category.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
     const settingId = `${cleanSeller}_${cleanCat}`;
 
+    const effectiveBulkTiers = customBulkTiers || getCategoryRange(category).bulkTiers;
+
     const setting: CategoryNegotiationSetting = {
       id: settingId,
       sellerId: activeSellerId,
       category,
       maxSingleDiscountPct: clampedSingle,
       maxBundleDiscountPct: clampedBundle,
+      bulkTiers: effectiveBulkTiers,
     };
 
     onUpsertCategorySetting(setting);
@@ -287,6 +319,7 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
           category: category.slice(0, 60),
           maxSingleDiscountPct: clampedSingle,
           maxBundleDiscountPct: clampedBundle,
+          bulkTiers: effectiveBulkTiers,
           updatedAt: serverTimestamp(),
         });
       } catch (err) {
@@ -297,6 +330,32 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
         }
       }
     }
+  };
+
+  const handleSaveBulkTiers = async () => {
+    const range = getCategoryRange(selectedBulkCategory);
+    await handleSaveCategoryRange(
+      selectedBulkCategory,
+      range.maxSingleDiscountPct,
+      range.maxBundleDiscountPct,
+      editingBulkTiers
+    );
+    setSavedBulkTiersMsg(`Bulk discount tiers saved for ${selectedBulkCategory}!`);
+    setTimeout(() => setSavedBulkTiersMsg(null), 2500);
+  };
+
+  const handleUpdateTierDiscount = (idx: number, newDiscount: number) => {
+    setEditingBulkTiers((prev) => {
+      const copy = [...prev];
+      if (copy[idx]) {
+        copy[idx] = { ...copy[idx], discountPct: Math.max(0, Math.min(40, newDiscount)) };
+      }
+      return copy;
+    });
+  };
+
+  const handleResetToStandardTiers = () => {
+    setEditingBulkTiers(DEFAULT_BULK_DISCOUNT_TIERS);
   };
 
   const startCameraScanner = async () => {
@@ -779,6 +838,218 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                   }
                 />
               ))}
+            </div>
+          </div>
+
+          {/* ADVANCED NEGOTIATION 2.0: Bulk Discount Tiers & Quantity-Based Pricing Rules */}
+          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wide">
+                    Advanced Negotiation 2.0
+                  </span>
+                  <span className="text-xs font-mono text-slate-500 font-semibold">Mode 2 & 3 Support</span>
+                </div>
+                <h2 className="font-display font-bold text-lg text-slate-900 flex items-center gap-2 mt-1">
+                  <Package className="w-5 h-5 text-indigo-600" />
+                  <span>Quantity-Based Pricing Rules (Bulk Discount Tiers)</span>
+                </h2>
+                <p className="text-xs text-slate-500 max-w-2xl mt-0.5">
+                  Configure volume discount tiers. When buyers request multiple units, DealMate AI automatically evaluates these tiers to create custom bulk agreements while preserving store profitability.
+                </p>
+              </div>
+
+              {/* Category Selector for Bulk Tiers */}
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <label className="text-xs font-mono text-slate-600 font-semibold whitespace-nowrap">
+                  Category:
+                </label>
+                <select
+                  value={selectedBulkCategory}
+                  onChange={(e) => setSelectedBulkCategory(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-mono font-semibold bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  {sellerCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Tiers Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+              {editingBulkTiers.map((tier, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-2xl border border-indigo-100 bg-indigo-50/40 space-y-2 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="font-bold text-indigo-950">
+                        {tier.maxQty ? `${tier.minQty}–${tier.maxQty} units` : `${tier.minQty}+ units`}
+                      </span>
+                      <span className="font-extrabold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md text-[11px]">
+                        {tier.discountPct}% off
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-sans">
+                      {tier.isCustomNegotiation
+                        ? 'Custom bulk threshold / wholesale pallet'
+                        : `Automatic volume rate for ${selectedBulkCategory}`}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5 pt-2">
+                    <input
+                      type="range"
+                      min={0}
+                      max={35}
+                      value={tier.discountPct}
+                      onChange={(e) => handleUpdateTierDiscount(idx, Number(e.target.value))}
+                      className="w-full accent-indigo-600 cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] font-mono text-slate-400">
+                      <span>0%</span>
+                      <span>Max 35%</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+              <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Protected by seller floor constraints. AI will never settle below viable margins.</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetToStandardTiers}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-mono font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Reset Defaults
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveBulkTiers}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-transform active:scale-[0.98]"
+                >
+                  {savedBulkTiersMsg ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                      <span>{savedBulkTiersMsg}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Save {selectedBulkCategory} Bulk Rules</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ADVANCED NEGOTIATION 2.0: Wholesale Collective Deal Pools (Mode 3 Group Orders) */}
+          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200 uppercase tracking-wide">
+                    Mode 3: Collective Deals
+                  </span>
+                  <span className="text-xs font-mono text-slate-500 font-semibold">Active Demand Pools</span>
+                </div>
+                <h2 className="font-display font-bold text-lg text-slate-900 flex items-center gap-2 mt-1">
+                  <Users className="w-5 h-5 text-purple-600" />
+                  <span>Active Collective Demand Pools (Wholesale Batches)</span>
+                </h2>
+                <p className="text-xs text-slate-500 max-w-2xl mt-0.5">
+                  Shoppers combine demand into group buy pools to unlock wholesale prices. Authorize batch production or early release when volume reaches target thresholds.
+                </p>
+              </div>
+
+              <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 font-bold self-start sm:self-auto">
+                {INITIAL_COLLECTIVE_POOLS.length} Active Pools Open
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {INITIAL_COLLECTIVE_POOLS.map((pool) => {
+                const isAuthorized = authorizedPoolIds[pool.id];
+                const pct = Math.min(100, Math.round((pool.currentQuantity / pool.targetQuantity) * 100));
+
+                return (
+                  <div
+                    key={pool.id}
+                    className="p-4 rounded-2xl border border-purple-100 bg-purple-50/30 space-y-3 flex flex-col justify-between"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-white border border-purple-200 text-purple-700">
+                          {pool.category}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-purple-600">
+                          {pool.participantsCount} Buyers Active
+                        </span>
+                      </div>
+                      <h4 className="font-display font-bold text-sm text-slate-900 line-clamp-1">
+                        {pool.productName}
+                      </h4>
+                      <div className="flex items-baseline justify-between text-xs font-mono pt-1">
+                        <span className="text-slate-500 line-through">MRP ₹{pool.listPrice.toLocaleString('en-IN')}</span>
+                        <span className="text-emerald-700 font-extrabold text-sm">
+                          Group Target ₹{pool.collectiveTargetPrice.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-mono text-slate-600">
+                        <span>Pledged: <strong>{pool.currentQuantity}</strong> / {pool.targetQuantity} units</span>
+                        <span className="font-bold text-purple-700">{pct}% ({pool.probabilityScore}% prob)</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-sans italic pt-1 line-clamp-1">
+                        {pool.sellerBenefitSummary}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setAuthorizedPoolIds((prev) => ({ ...prev, [pool.id]: !prev[pool.id] }))}
+                      className={`w-full py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                        isAuthorized
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-purple-600 hover:bg-purple-500 text-white'
+                      }`}
+                    >
+                      {isAuthorized ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Batch Authorized for Dispatch</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Authorize Wholesale Group Fulfillment</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

@@ -484,6 +484,7 @@ export default function App() {
             maxBundleDiscountPct: Number(
               d.maxBundleDiscountPct ?? MAX_BUNDLE_DISCOUNT
             ),
+            bulkTiers: Array.isArray(d.bulkTiers) ? d.bulkTiers : undefined,
           };
         });
         setCategorySettings((prev) => {

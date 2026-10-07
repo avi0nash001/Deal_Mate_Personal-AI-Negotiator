@@ -947,7 +947,11 @@ Return a JSON object with:
 /**
  * Multi-Round Buyer Agent <-> Seller Agent Negotiation Exchange Endpoint
  * Runs 2-3 rounds of buyer-ask -> seller-counter, stopping early once buyerAsk >= sellerCounter
- * or after round limit, and never settling below the category_negotiation_settings floor.
+  * or after round limit, and never settling below the category_negotiation_settings floor.
+ * Supports Advanced Negotiation System 2.0:
+ * - Mode 1: Individual Negotiation
+ * - Mode 2: Bulk Quantity Negotiation (volume tier discount)
+ * - Mode 3: Collective / Group Deal (demand pooled rate)
  */
 app.post('/api/negotiation/run-exchange', requireAuth, async (req, res) => {
   try {
@@ -957,6 +961,9 @@ app.post('/api/negotiation/run-exchange', requireAuth, async (req, res) => {
       maxSingleDiscountPct,
       maxBundleDiscountPct,
       isBundle = false,
+      quantity = 1,
+      mode = 'INDIVIDUAL',
+      bulkDiscountPct,
     } = req.body;
 
     if (!product || typeof product.listPrice !== 'number') {
@@ -965,8 +972,17 @@ app.post('/api/negotiation/run-exchange', requireAuth, async (req, res) => {
     }
 
     const listPrice = Number(product.listPrice);
-    const discountPct = isBundle ? maxBundleDiscountPct : maxSingleDiscountPct;
-    const floorPrice = computePriceFloor(listPrice, discountPct, isBundle);
+    const orderQty = Math.max(1, Number(quantity) || 1);
+
+    // Compute effective discount % respecting mode & bulk volume rules
+    let effectiveDiscountPct = isBundle ? maxBundleDiscountPct : maxSingleDiscountPct;
+    if (mode === 'BULK' || orderQty >= 3) {
+      effectiveDiscountPct = Math.max(effectiveDiscountPct || 15, Number(bulkDiscountPct) || 12);
+    } else if (mode === 'COLLECTIVE') {
+      effectiveDiscountPct = Math.max(effectiveDiscountPct || 15, 18);
+    }
+
+    const floorPrice = computePriceFloor(listPrice, effectiveDiscountPct, isBundle || mode === 'BULK');
 
     const maxRounds = 3;
     const turns: Array<{
@@ -985,10 +1001,22 @@ app.post('/api/negotiation/run-exchange', requireAuth, async (req, res) => {
 
     for (let round = 1; round <= maxRounds; round++) {
       // Buyer Agent Turn
-      const buyerMsg =
-        round === 1
-          ? `Buyer's Agent: Offering ₹${currentBuyerAsk.toLocaleString('en-IN')} for ${product.name} (List: ₹${listPrice.toLocaleString('en-IN')}) with immediate checkout readiness.`
-          : `Buyer's Agent: Stepping up our offer to ₹${currentBuyerAsk.toLocaleString('en-IN')} to close the deal right now.`;
+      let buyerMsg = '';
+      if (round === 1) {
+        if (mode === 'BULK' || orderQty >= 3) {
+          buyerMsg = `Buyer's Agent: Purchasing ${orderQty} units of ${product.name} (List: ₹${listPrice.toLocaleString('en-IN')}/unit). Requesting volume bulk tier at ₹${currentBuyerAsk.toLocaleString('en-IN')}/unit (total order value: ₹${(currentBuyerAsk * orderQty).toLocaleString('en-IN')}). Immediate settlement ready.`;
+        } else if (mode === 'COLLECTIVE') {
+          buyerMsg = `Buyer's Agent: Pledging order into verified Collective Pool for ${product.name}. Requesting pooled volume rate of ₹${currentBuyerAsk.toLocaleString('en-IN')}/unit based on aggregate group demand.`;
+        } else {
+          buyerMsg = `Buyer's Agent: Offering ₹${currentBuyerAsk.toLocaleString('en-IN')} for ${product.name} (List: ₹${listPrice.toLocaleString('en-IN')}) with immediate checkout readiness.`;
+        }
+      } else {
+        if (mode === 'BULK' || orderQty >= 3) {
+          buyerMsg = `Buyer's Agent: Stepping up to ₹${currentBuyerAsk.toLocaleString('en-IN')}/unit for ${orderQty} units (total: ₹${(currentBuyerAsk * orderQty).toLocaleString('en-IN')}) to secure volume dispatch now.`;
+        } else {
+          buyerMsg = `Buyer's Agent: Stepping up our offer to ₹${currentBuyerAsk.toLocaleString('en-IN')} to close the deal right now.`;
+        }
+      }
 
       turns.push({
         round,
@@ -999,12 +1027,17 @@ app.post('/api/negotiation/run-exchange', requireAuth, async (req, res) => {
 
       // Check if buyer ask already meets or exceeds current seller offer
       if (currentBuyerAsk >= currentSellerOffer) {
-        settledPrice = clampNegotiatedPrice(currentBuyerAsk, listPrice, discountPct, isBundle);
+        settledPrice = clampNegotiatedPrice(currentBuyerAsk, listPrice, effectiveDiscountPct, isBundle || mode === 'BULK');
+        const acceptMsg =
+          mode === 'BULK' || orderQty >= 3
+            ? `Seller's Agent (${product.sellerName}): Bulk order of ${orderQty} units accepted at ₹${settledPrice.toLocaleString('en-IN')}/unit (total: ₹${(settledPrice * orderQty).toLocaleString('en-IN')})! Batch logistics scheduled.`
+            : `Seller's Agent (${product.sellerName}): Deal accepted at ₹${settledPrice.toLocaleString('en-IN')}! Locking your unit price now.`;
+
         turns.push({
           round,
           speaker: 'SELLER_AGENT',
           price: settledPrice,
-          message: `Seller's Agent (${product.sellerName}): Deal accepted at ₹${settledPrice.toLocaleString('en-IN')}! Locking your unit price now.`,
+          message: acceptMsg,
         });
         break;
       }
@@ -1025,8 +1058,8 @@ app.post('/api/negotiation/run-exchange', requireAuth, async (req, res) => {
       currentSellerOffer = clampNegotiatedPrice(
         sellerReply.counterPrice,
         listPrice,
-        discountPct,
-        isBundle
+        effectiveDiscountPct,
+        isBundle || mode === 'BULK'
       );
 
       turns.push({
@@ -1045,11 +1078,16 @@ app.post('/api/negotiation/run-exchange', requireAuth, async (req, res) => {
       if (round === maxRounds) {
         // Settle at the seller's final clamped counter on the final round
         settledPrice = currentSellerOffer;
+        const finalAcceptMsg =
+          mode === 'BULK' || orderQty >= 3
+            ? `Buyer's Agent: Accepting ${product.sellerName}'s final volume bulk offer of ₹${settledPrice.toLocaleString('en-IN')}/unit for ${orderQty} units (total ₹${(settledPrice * orderQty).toLocaleString('en-IN')}, saving ₹${((listPrice - settledPrice) * orderQty).toLocaleString('en-IN')}).`
+            : `Buyer's Agent: Accepting ${product.sellerName}'s final floor-verified offer of ₹${settledPrice.toLocaleString('en-IN')} (saving ₹${(listPrice - settledPrice).toLocaleString('en-IN')}).`;
+
         turns.push({
           round,
           speaker: 'BUYER_AGENT',
           price: settledPrice,
-          message: `Buyer's Agent: Accepting ${product.sellerName}'s final floor-verified offer of ₹${settledPrice.toLocaleString('en-IN')} (saving ₹${(listPrice - settledPrice).toLocaleString('en-IN')}).`,
+          message: finalAcceptMsg,
         });
         break;
       }
@@ -1059,19 +1097,214 @@ app.post('/api/negotiation/run-exchange', requireAuth, async (req, res) => {
       currentBuyerAsk = Math.min(currentSellerOffer, nextAsk);
     }
 
-    settledPrice = clampNegotiatedPrice(settledPrice, listPrice, discountPct, isBundle);
+    settledPrice = clampNegotiatedPrice(settledPrice, listPrice, effectiveDiscountPct, isBundle || mode === 'BULK');
 
     res.json({
       turns,
       settledPrice,
+      quantity: orderQty,
+      totalPrice: settledPrice * orderQty,
       floorPrice,
       listPrice,
       savings: Math.max(0, listPrice - settledPrice),
+      totalSavings: Math.max(0, (listPrice - settledPrice) * orderQty),
       sellerName: product.sellerName || 'Verified Store',
+      mode,
     });
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Failed to run negotiation exchange.' });
   }
+});
+
+// ============================================================================
+// ADVANCED NEGOTIATION SYSTEM 2.0: COLLECTIVE DEAL POOLS SERVER-SIDE STATE & APIS
+// ============================================================================
+interface ServerCollectivePool {
+  id: string;
+  productId: string;
+  productName: string;
+  category: string;
+  sellerId: string;
+  sellerName: string;
+  listPrice: number;
+  individualSettledPrice: number;
+  collectiveTargetPrice: number;
+  targetQuantity: number;
+  currentQuantity: number;
+  participantsCount: number;
+  participants: Array<{
+    userId: string;
+    userName: string;
+    pledgedQty: number;
+    pledgedAt: number;
+  }>;
+  status: 'FORMING' | 'ACTIVE' | 'UNLOCKED' | 'EXPIRED';
+  expiresAt: number;
+  probabilityScore: number;
+  sellerBenefitSummary: string;
+  inventoryAvailable: number;
+  createdAt: number;
+}
+
+const serverCollectivePools: ServerCollectivePool[] = [
+  {
+    id: 'pool_boat_141',
+    productId: 'amz_boat_airdopes_141',
+    productName: 'boAt Airdopes 141 ANC True Wireless Earbuds',
+    category: 'Electronics',
+    sellerId: 'amazon_india_api',
+    sellerName: 'boAt Official Store (Amazon)',
+    listPrice: 1499,
+    individualSettledPrice: 1449,
+    collectiveTargetPrice: 1299,
+    targetQuantity: 20,
+    currentQuantity: 14,
+    participantsCount: 8,
+    status: 'ACTIVE',
+    expiresAt: Date.now() + 5 * 3600 * 1000 + 42 * 60 * 1000,
+    probabilityScore: 88,
+    sellerBenefitSummary:
+      'Guaranteed 20-unit dispatch batch, reduced per-unit logistics overhead, zero advertising spend.',
+    inventoryAvailable: 140,
+    createdAt: Date.now() - 3600 * 1000 * 18,
+    participants: [
+      { userId: 'usr_p1', userName: 'Kabir Mehta', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 12 },
+      { userId: 'usr_p2', userName: 'Ananya Roy', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 10 },
+      { userId: 'usr_p3', userName: 'Devendra S.', pledgedQty: 3, pledgedAt: Date.now() - 3600 * 1000 * 7 },
+      { userId: 'usr_p4', userName: 'Pooja Iyer', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 5 },
+      { userId: 'usr_p5', userName: 'Mohit Chawla', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 4 },
+      { userId: 'usr_p6', userName: 'Shruti V.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 3 },
+      { userId: 'usr_p7', userName: 'Tanya Bansal', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 2 },
+      { userId: 'usr_p8', userName: 'Karan J.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 1 },
+    ],
+  },
+  {
+    id: 'pool_sonicpulse_01',
+    productId: 'prod_earbuds_01',
+    productName: 'SonicPulse Pro ANC Wireless Earbuds',
+    category: 'Electronics',
+    sellerId: 'store_owner_apex_02',
+    sellerName: 'Apex Sound & Tech Direct',
+    listPrice: 2999,
+    individualSettledPrice: 2499,
+    collectiveTargetPrice: 2199,
+    targetQuantity: 15,
+    currentQuantity: 11,
+    participantsCount: 6,
+    status: 'ACTIVE',
+    expiresAt: Date.now() + 8 * 3600 * 1000,
+    probabilityScore: 82,
+    sellerBenefitSummary:
+      'Direct warehouse bulk pallet clearance, zero single-item return overhead.',
+    inventoryAvailable: 85,
+    createdAt: Date.now() - 3600 * 1000 * 14,
+    participants: [
+      { userId: 'usr_sp1', userName: 'Nikhil R.', pledgedQty: 3, pledgedAt: Date.now() - 3600 * 1000 * 8 },
+      { userId: 'usr_sp2', userName: 'Zoya Khan', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 6 },
+      { userId: 'usr_sp3', userName: 'Arjun P.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 4 },
+      { userId: 'usr_sp4', userName: 'Ritika M.', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 3 },
+      { userId: 'usr_sp5', userName: 'Vikram S.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 2 },
+      { userId: 'usr_sp6', userName: 'Gaurav B.', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 1 },
+    ],
+  },
+  {
+    id: 'pool_sneakers_01',
+    productId: 'prod_sneakers_01',
+    productName: 'NovaGlide Campus Casual Low-Top Sneakers',
+    category: 'Footwear',
+    sellerId: 'store_owner_kicks_03',
+    sellerName: 'SoleCraft & Kicks Hub',
+    listPrice: 2499,
+    individualSettledPrice: 2099,
+    collectiveTargetPrice: 1799,
+    targetQuantity: 25,
+    currentQuantity: 19,
+    participantsCount: 12,
+    status: 'ACTIVE',
+    expiresAt: Date.now() + 11 * 3600 * 1000,
+    probabilityScore: 91,
+    sellerBenefitSummary:
+      'Campus batch delivery, single pickup point, clearance of seasonal inventory run.',
+    inventoryAvailable: 95,
+    createdAt: Date.now() - 3600 * 1000 * 20,
+    participants: [
+      { userId: 'usr_sn1', userName: 'Sameer K.', pledgedQty: 2, pledgedAt: Date.now() - 3600 * 1000 * 15 },
+      { userId: 'usr_sn2', userName: 'Pooja T.', pledgedQty: 1, pledgedAt: Date.now() - 3600 * 1000 * 12 },
+      { userId: 'usr_sn3', userName: 'Harshita D.', pledgedQty: 3, pledgedAt: Date.now() - 3600 * 1000 * 9 },
+    ],
+  },
+];
+
+app.get('/api/collective-deals', (_req, res) => {
+  res.json({ pools: serverCollectivePools });
+});
+
+app.post('/api/collective-deals/pledge', requireAuth, (req, res) => {
+  const { poolId, pledgedQty = 1, userName, userId } = req.body;
+  const pool = serverCollectivePools.find((p) => p.id === poolId);
+  if (!pool) {
+    res.status(404).json({ error: 'Collective deal pool not found' });
+    return;
+  }
+
+  const safeQty = Math.max(1, Math.min(10, Number(pledgedQty) || 1));
+  pool.currentQuantity += safeQty;
+  pool.participantsCount += 1;
+  pool.participants.push({
+    userId: userId || 'usr_anonymous_' + Math.random().toString(36).slice(2, 6),
+    userName: userName || 'DealMate Buyer',
+    pledgedQty: safeQty,
+    pledgedAt: Date.now(),
+  });
+
+  if (pool.currentQuantity >= pool.targetQuantity) {
+    pool.status = 'UNLOCKED';
+    pool.probabilityScore = 100;
+  } else {
+    pool.probabilityScore = Math.min(99, Math.round((pool.currentQuantity / pool.targetQuantity) * 95) + 5);
+  }
+
+  res.json({ success: true, pool });
+});
+
+app.post('/api/collective-deals/create', requireAuth, (req, res) => {
+  const { product, targetQuantity = 20, collectiveTargetPrice } = req.body;
+  if (!product || !product.id) {
+    res.status(400).json({ error: 'Valid product is required to start a collective pool' });
+    return;
+  }
+
+  const newPool: ServerCollectivePool = {
+    id: 'pool_' + Math.random().toString(36).slice(2, 9),
+    productId: product.id,
+    productName: product.name,
+    category: product.category || 'General',
+    sellerId: product.sellerId || 'seller_verified',
+    sellerName: product.sellerName || 'Verified Merchant',
+    listPrice: product.listPrice,
+    individualSettledPrice: Math.round(product.listPrice * 0.9),
+    collectiveTargetPrice: collectiveTargetPrice || Math.round(product.listPrice * 0.82),
+    targetQuantity: Math.max(5, Number(targetQuantity) || 20),
+    currentQuantity: 1,
+    participantsCount: 1,
+    status: 'ACTIVE',
+    expiresAt: Date.now() + 24 * 3600 * 1000,
+    probabilityScore: 65,
+    sellerBenefitSummary: 'Aggregated consumer volume, direct pallet fulfillment without retail marketing cost.',
+    inventoryAvailable: product.stock || 50,
+    createdAt: Date.now(),
+    participants: [
+      {
+        userId: 'usr_creator_' + Math.random().toString(36).slice(2, 6),
+        userName: 'Pool Initiator',
+        pledgedQty: 1,
+        pledgedAt: Date.now(),
+      },
+    ],
+  };
+
+  serverCollectivePools.unshift(newPool);
+  res.json({ success: true, pool: newPool });
 });
 
 /**

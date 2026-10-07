@@ -6,8 +6,11 @@ import {
   ActivityLogEntry,
   CategoryNegotiationSetting,
   NegotiationExchangeTurn,
+  BulkDiscountTier,
+  CollectiveDealPool,
+  NegotiationMode,
 } from '../types';
-import { SELLERS } from '../data/catalog';
+import { SELLERS, DEFAULT_BULK_DISCOUNT_TIERS, INITIAL_COLLECTIVE_POOLS } from '../data/catalog';
 
 export const MAX_SINGLE_ITEM_DISCOUNT = 15; // 15% default -> 0.85 floor
 export const MAX_BUNDLE_DISCOUNT = 20; // 20% default -> 0.80 floor
@@ -396,6 +399,215 @@ export class NegotiationEngine {
       status: 'LOCKED',
       expiresAt: Date.now() + 15 * 60 * 1000,
       dealHash: 'SHA256:' + Math.random().toString(36).substring(2, 14).toUpperCase(),
+    };
+  }
+
+  /**
+   * ADVANCED NEGOTIATION SYSTEM 2.0:
+   * Resolves the quantity-based bulk discount tier according to store owner rules,
+   * product-level tiers, or system defaults:
+   * 1–2 units: 0–5% (4%)
+   * 3–5 units: 5–8% (7%)
+   * 6–10 units: 8–12% (10%)
+   * 11–25 units: 12–15% (14%)
+   * 25+ units: Custom negotiation (18%)
+   */
+  static resolveBulkDiscountTier(
+    qty: number,
+    product?: Product,
+    categorySettings: CategoryNegotiationSetting[] = []
+  ): BulkDiscountTier {
+    const matchedSetting = product ? resolveCategorySetting(product, categorySettings) : undefined;
+    const availableTiers =
+      matchedSetting?.bulkTiers && matchedSetting.bulkTiers.length > 0
+        ? matchedSetting.bulkTiers
+        : product?.bulkDiscountTiers && product.bulkDiscountTiers.length > 0
+        ? product.bulkDiscountTiers
+        : DEFAULT_BULK_DISCOUNT_TIERS;
+
+    const safeQty = Math.max(1, qty);
+
+    const foundTier = availableTiers.find((tier) => {
+      if (tier.maxQty !== undefined && tier.maxQty !== null) {
+        return safeQty >= tier.minQty && safeQty <= tier.maxQty;
+      }
+      return safeQty >= tier.minQty;
+    });
+
+    if (foundTier) return foundTier;
+
+    // Fallback if none matched
+    if (safeQty >= 25) {
+      return { minQty: 26, discountPct: 18, label: '25+ units (Custom volume)' };
+    }
+    return DEFAULT_BULK_DISCOUNT_TIERS[0];
+  }
+
+  /**
+   * Calculates the bulk target unit price respecting seller floor constraint.
+   */
+  static computeBulkUnitPrice(
+    listPrice: number,
+    qty: number,
+    product?: Product,
+    categorySettings: CategoryNegotiationSetting[] = []
+  ): number {
+    const tier = this.resolveBulkDiscountTier(qty, product, categorySettings);
+    const matchedSetting = product ? resolveCategorySetting(product, categorySettings) : undefined;
+    const maxAllowedDiscountPct = matchedSetting?.maxBundleDiscountPct ?? 25;
+
+    // Bulk discount is capped by max allowed discount percentage
+    const effectiveDiscountPct = Math.min(tier.discountPct, maxAllowedDiscountPct);
+    const rawBulkPrice = Math.round(listPrice * (1 - effectiveDiscountPct / 100));
+
+    // Also protect against hard floor
+    const absoluteFloor = priceFloor(listPrice, maxAllowedDiscountPct, true);
+    return Math.max(absoluteFloor, rawBulkPrice);
+  }
+
+  /**
+   * ADVANCED NEGOTIATION SYSTEM 2.0:
+   * Multi-criteria evaluation determining whether individual negotiation,
+   * bulk negotiation, or collective deal offers highest customer value
+   * while safeguarding seller profitability & inventory constraints.
+   */
+  static evaluateAdvancedNegotiationPath(params: {
+    product: Product;
+    quantity: number;
+    currentOffer: number;
+    userBudget: { target: number; maxBudget: number };
+    categorySettings?: CategoryNegotiationSetting[];
+    activePools?: CollectiveDealPool[];
+  }): {
+    currentMode: NegotiationMode;
+    product: Product;
+    quantity: number;
+    currentUnitOffer: number;
+    currentTotal: number;
+    sellerFloorUnitPrice: number;
+    // Bulk Details
+    canQualifyForBulk: boolean;
+    bulkTier: BulkDiscountTier;
+    bulkUnitPrice: number;
+    bulkTotal: number;
+    bulkSavings: number;
+    bulkRecommendationText: string;
+    // Collective Deal Details
+    canQualifyForCollective: boolean;
+    collectivePool: CollectiveDealPool | null;
+    collectiveUnitPrice: number;
+    collectiveTotal: number;
+    collectiveSavings: number;
+    collectiveRecommendationText: string;
+    // Decision
+    recommendedNextStep: 'STAY_INDIVIDUAL' | 'OFFER_BULK' | 'OFFER_COLLECTIVE' | 'PROCEED_CHECKOUT';
+    aiRationale: string;
+    sellerProfitabilityProtected: boolean;
+    inventorySufficient: boolean;
+  } {
+    const {
+      product,
+      quantity,
+      currentOffer,
+      userBudget,
+      categorySettings = [],
+      activePools = INITIAL_COLLECTIVE_POOLS,
+    } = params;
+
+    const listPrice = product.listPrice;
+    const matchedSetting = resolveCategorySetting(product, categorySettings);
+    const maxDiscountPct =
+      matchedSetting?.maxSingleDiscountPct ?? product.maxDiscountPercent ?? MAX_SINGLE_ITEM_DISCOUNT;
+    const sellerFloor = priceFloor(listPrice, maxDiscountPct, false);
+
+    // Current totals
+    const currentUnitOffer = Math.max(sellerFloor, currentOffer);
+    const currentTotal = currentUnitOffer * quantity;
+
+    // Evaluate Bulk Opportunity
+    const bulkTier = this.resolveBulkDiscountTier(quantity, product, categorySettings);
+    const bulkUnitPrice = this.computeBulkUnitPrice(listPrice, quantity, product, categorySettings);
+    const bulkTotal = bulkUnitPrice * quantity;
+    const bulkSavings = Math.max(0, currentTotal - bulkTotal);
+
+    // Can qualify for bulk: if quantity > 2 OR if purchasing multiple units
+    const canQualifyForBulk = quantity >= 3 || (quantity >= 2 && bulkSavings > 0);
+
+    const bulkRecommendationText =
+      quantity >= 3
+        ? `You're already close to my best individual price. Because you're purchasing ${quantity} units, I can try a bulk negotiation with the seller.`
+        : `If you need 3 or more units, you can unlock tiered bulk pricing with up to ${bulkTier.discountPct}% volume savings.`;
+
+    // Evaluate Collective Pool Opportunity
+    // Find active pool for this product or category
+    const matchedPool =
+      activePools.find(
+        (p) =>
+          (p.productId === product.id || p.productName.toLowerCase() === product.name.toLowerCase()) &&
+          p.status === 'ACTIVE'
+      ) ||
+      activePools.find((p) => p.category === product.category && p.status === 'ACTIVE') ||
+      null;
+
+    const collectiveUnitPrice = matchedPool
+      ? matchedPool.collectiveTargetPrice
+      : Math.round(listPrice * 0.85); // 15% collective benchmark
+    const collectiveTotal = collectiveUnitPrice * quantity;
+    const collectiveSavings = Math.max(0, currentTotal - collectiveTotal);
+    const canQualifyForCollective = Boolean(matchedPool && collectiveSavings > 0);
+
+    const collectiveRecommendationText = matchedPool
+      ? `Pool demand with ${matchedPool.participantsCount} other buyers! ${matchedPool.currentQuantity}/${matchedPool.targetQuantity} units pledged. Lock unit price at ₹${matchedPool.collectiveTargetPrice.toLocaleString('en-IN')}.`
+      : 'Start or join a Collective Deal to pool demand with other buyers and unlock wholesale rates without ordering in bulk alone.';
+
+    // Logic: determine recommended next step
+    let recommendedNextStep: 'STAY_INDIVIDUAL' | 'OFFER_BULK' | 'OFFER_COLLECTIVE' | 'PROCEED_CHECKOUT' =
+      'STAY_INDIVIDUAL';
+    let aiRationale = '';
+
+    // Check if buyer has reached the maximum reasonable individual negotiation
+    const isAtIndividualFloor = Math.abs(currentUnitOffer - sellerFloor) <= listPrice * 0.03;
+
+    if (quantity >= 3 && bulkSavings > 0) {
+      recommendedNextStep = 'OFFER_BULK';
+      aiRationale = `High quantity (${quantity} units) triggers Volume Bulk Negotiation. Seller margin is preserved by batch fulfillment efficiencies.`;
+    } else if (isAtIndividualFloor && canQualifyForCollective) {
+      recommendedNextStep = 'OFFER_COLLECTIVE';
+      aiRationale = `Individual offer is at seller floor limit (₹${sellerFloor.toLocaleString('en-IN')}). Transitioning to Collective Pool will aggregate volume and unlock wholesale tier.`;
+    } else if (isAtIndividualFloor) {
+      recommendedNextStep = 'PROCEED_CHECKOUT';
+      aiRationale = `Individual negotiation has achieved maximum allowable margin reduction. Price is locked at verified seller floor.`;
+    } else {
+      recommendedNextStep = 'STAY_INDIVIDUAL';
+      aiRationale = `Standard individual exchange in progress within authorized margin boundaries.`;
+    }
+
+    const inventorySufficient = product.stock >= quantity;
+    const sellerProfitabilityProtected = bulkUnitPrice >= priceFloor(listPrice, 30, true);
+
+    return {
+      currentMode: quantity >= 3 ? 'BULK' : 'INDIVIDUAL',
+      product,
+      quantity,
+      currentUnitOffer,
+      currentTotal,
+      sellerFloorUnitPrice: sellerFloor,
+      canQualifyForBulk,
+      bulkTier,
+      bulkUnitPrice,
+      bulkTotal,
+      bulkSavings,
+      bulkRecommendationText,
+      canQualifyForCollective,
+      collectivePool: matchedPool,
+      collectiveUnitPrice,
+      collectiveTotal,
+      collectiveSavings,
+      collectiveRecommendationText,
+      recommendedNextStep,
+      aiRationale,
+      sellerProfitabilityProtected,
+      inventorySufficient,
     };
   }
 }

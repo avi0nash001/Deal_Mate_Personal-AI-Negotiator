@@ -6,6 +6,9 @@ import {
   ActivityLogEntry,
   NegotiationExchangeTurn,
   AppUser,
+  BulkDiscountTier,
+  CollectiveDealPool,
+  NegotiationMode,
 } from '../../types';
 import { ThemeId, THEMES } from '../../types/theme';
 import { soundEffects } from '../../services/soundEffects';
@@ -25,7 +28,9 @@ import {
   resolveCategorySetting,
   priceFloor,
   MAX_SINGLE_ITEM_DISCOUNT,
+  NegotiationEngine,
 } from '../../services/negotiationEngine';
+import { INITIAL_COLLECTIVE_POOLS, DEFAULT_BULK_DISCOUNT_TIERS } from '../../data/catalog';
 import { getAuthHeaders } from '../../services/authHeaders';
 import {
   ProductResultsPanel,
@@ -59,6 +64,10 @@ import {
   ChevronRight,
   RotateCcw,
   Plus,
+  Minus,
+  Users,
+  TrendingUp,
+  Package,
   Layers,
   MapPin,
   Truck,
@@ -222,6 +231,29 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
     activeNegotiation: null,
     alternativeCandidates: [],
   });
+
+  // ADVANCED NEGOTIATION SYSTEM 2.0: Multi-Mode Negotiation States
+  const [negotiationQuantity, setNegotiationQuantity] = useState<number>(1);
+  const [negotiationMode, setNegotiationMode] = useState<NegotiationMode>('INDIVIDUAL');
+  const [collectivePools, setCollectivePools] = useState<CollectiveDealPool[]>(INITIAL_COLLECTIVE_POOLS);
+  const [activeCollectiveModalPool, setActiveCollectiveModalPool] = useState<CollectiveDealPool | null>(null);
+  const [pledgedQtyInput, setPledgedQtyInput] = useState<number>(1);
+  const [isCollectivePledging, setIsCollectivePledging] = useState<boolean>(false);
+  const [collectivePledgeSuccess, setCollectivePledgeSuccess] = useState<string | null>(null);
+
+  // Sync collective pools from backend API on mount
+  useEffect(() => {
+    fetch('/api/collective-deals')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.pools) && data.pools.length > 0) {
+          setCollectivePools(data.pools);
+        }
+      })
+      .catch(() => {
+        // Fallback to pre-seeded catalog pools
+      });
+  }, []);
 
   // Reset conversation if user logs in/out or switches accounts
   useEffect(() => {
@@ -515,10 +547,13 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
 
   /**
    * Launch or run bounded Buyer AI <-> Seller AI negotiation inside the conversation
+   * ADVANCED NEGOTIATION SYSTEM 2.0: Supports Mode 1 (Individual), Mode 2 (Bulk), and Mode 3 (Collective)
    */
   const startInlineProductNegotiation = async (
     product: Product,
-    customTargetAsk?: number
+    customTargetAsk?: number,
+    customQuantity?: number,
+    chosenMode?: NegotiationMode
   ) => {
     setSelectedProduct(product);
     setAgentStatus({
@@ -526,6 +561,11 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
       dealHunter: 'completed',
       negotiator: 'active',
     });
+
+    const orderQty = Math.max(1, customQuantity || negotiationQuantity || preferences?.quantity || 1);
+    const effectiveMode: NegotiationMode = chosenMode || (orderQty >= 3 ? 'BULK' : 'INDIVIDUAL');
+    setNegotiationQuantity(orderQty);
+    setNegotiationMode(effectiveMode);
 
     const matchedSetting = resolveCategorySetting(product, categorySettings);
     const maxPct =
@@ -538,11 +578,22 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
     );
 
     const userBudget = preferences?.budget || product.listPrice;
-    const rawTarget =
-      customTargetAsk ||
-      Math.min(userBudget, Math.round(product.listPrice * 0.86));
+
+    // Resolve target unit price depending on mode
+    let rawTarget = product.listPrice * 0.86;
+    let bulkTierInfo: BulkDiscountTier | undefined = undefined;
+
+    if (effectiveMode === 'BULK' || orderQty >= 3) {
+      bulkTierInfo = NegotiationEngine.resolveBulkDiscountTier(orderQty, product, categorySettings);
+      rawTarget = customTargetAsk || NegotiationEngine.computeBulkUnitPrice(product.listPrice, orderQty, product, categorySettings);
+    } else {
+      rawTarget =
+        customTargetAsk ||
+        Math.min(userBudget, Math.round(product.listPrice * 0.86));
+    }
+
     // Never promise a discount below the seller's floor
-    const boundedTarget = Math.max(floor, Math.min(product.listPrice - 50, rawTarget));
+    const boundedTarget = Math.max(floor, Math.min(product.listPrice - 50, Math.round(rawTarget)));
 
     const workspaceMsgId = `msg_neg_ws_${Date.now()}`;
     const initialWorkspace: NegotiationWorkspaceData = {
@@ -556,18 +607,29 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
       savings: 0,
       isSimulatedDemo: !product.isStoreOwnerListed,
       turns: [],
-      quantity: preferences?.quantity || 1,
+      quantity: orderQty,
+      mode: effectiveMode,
+      bulkTier: bulkTierInfo,
+      bulkTotal: boundedTarget * orderQty,
+      bulkSavings: Math.max(0, (product.listPrice - boundedTarget) * orderQty),
       bundleSuggestion: product.bundleEligible
         ? 'Eligible for additional 5% bundle discount when paired with an accessory.'
         : undefined,
     };
+
+    const modeLabel =
+      effectiveMode === 'BULK' || orderQty >= 3
+        ? `volume bulk purchase (${orderQty} units)`
+        : effectiveMode === 'COLLECTIVE'
+        ? 'collective deal pool'
+        : 'individual order';
 
     const negotiatingTurn: ChatTurnMessage = {
       id: workspaceMsgId,
       role: 'assistant',
       agentLabel: 'Negotiator',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      text: `Initiating bounded Buyer AI ↔ Seller AI negotiation with ${product.sellerName} for ${product.name}...`,
+      text: `Initiating ${modeLabel} AI ↔ Seller AI negotiation with ${product.sellerName} for ${product.name}...`,
       negotiationWorkspace: initialWorkspace,
     };
 
@@ -602,7 +664,10 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
           buyerInitialAsk: boundedTarget,
           maxSingleDiscountPct: maxPct,
           maxBundleDiscountPct: matchedSetting?.maxBundleDiscountPct,
-          isBundle: (preferences?.quantity || 1) > 1,
+          isBundle: orderQty > 1,
+          quantity: orderQty,
+          mode: effectiveMode,
+          bulkDiscountPct: bulkTierInfo?.discountPct,
         }),
       });
       const data = await res.json();
@@ -617,55 +682,62 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
     if (turns.length === 0) {
       const midOffer = Math.round((product.listPrice + boundedTarget) / 2);
       settledPrice = Math.max(floor, boundedTarget);
+      const isBulk = effectiveMode === 'BULK' || orderQty >= 3;
+
       turns = [
         {
           round: 1,
           speaker: 'BUYER_AGENT',
           price: boundedTarget,
-          message: `Buyer AI: Requesting ₹${boundedTarget.toLocaleString(
-            'en-IN'
-          )} based on user budget of ₹${userBudget.toLocaleString(
-            'en-IN'
-          )} and competing marketplace benchmarks.`,
+          message: isBulk
+            ? `Buyer AI: Requesting bulk volume tier at ₹${boundedTarget.toLocaleString('en-IN')}/unit for ${orderQty} units (Total: ₹${(boundedTarget * orderQty).toLocaleString('en-IN')}) with immediate settlement.`
+            : `Buyer AI: Requesting ₹${boundedTarget.toLocaleString('en-IN')} based on user budget of ₹${userBudget.toLocaleString('en-IN')} and competing marketplace benchmarks.`,
         },
         {
           round: 1,
           speaker: 'SELLER_AGENT',
           price: midOffer,
-          message: `${product.sellerName} AI: We can counter at ₹${midOffer.toLocaleString(
-            'en-IN'
-          )} with express dispatch and full warranty.`,
+          message: isBulk
+            ? `${product.sellerName} AI: Volume order of ${orderQty} units noted. We can offer ₹${midOffer.toLocaleString('en-IN')}/unit with priority warehouse dispatch.`
+            : `${product.sellerName} AI: We can counter at ₹${midOffer.toLocaleString('en-IN')} with express dispatch and full warranty.`,
         },
         {
           round: 2,
           speaker: 'BUYER_AGENT',
           price: settledPrice,
-          message: `Buyer AI: Counter-proposing ₹${settledPrice.toLocaleString(
-            'en-IN'
-          )} for immediate checkout confirmation.`,
+          message: `Buyer AI: Counter-proposing ₹${settledPrice.toLocaleString('en-IN')} for immediate checkout confirmation.`,
         },
         {
           round: 2,
           speaker: 'SELLER_AGENT',
           price: settledPrice,
-          message: `${product.sellerName} AI: Deal accepted at ₹${settledPrice.toLocaleString(
-            'en-IN'
-          )} (verified within seller floor constraints).`,
+          message: `${product.sellerName} AI: Deal accepted at ₹${settledPrice.toLocaleString('en-IN')}${isBulk ? '/unit' : ''} (verified within seller floor constraints).`,
         },
       ];
     }
 
-    const savings = Math.max(0, product.listPrice - settledPrice);
+    const savingsPerUnit = Math.max(0, product.listPrice - settledPrice);
+    const totalSavings = savingsPerUnit * orderQty;
+
+    // Evaluate Collective Pool for cross-recommendation
+    const matchedPool =
+      collectivePools.find(
+        (p) =>
+          (p.productId === product.id || p.productName.toLowerCase() === product.name.toLowerCase()) &&
+          p.status === 'ACTIVE'
+      ) ||
+      collectivePools.find((p) => p.category === product.category && p.status === 'ACTIVE') ||
+      undefined;
 
     setTimeout(() => {
       setConversationHistory((prev) =>
         prev.map((m) => {
           if (m.id !== workspaceMsgId) return m;
-          const summaryMsg = `Negotiation complete for ${product.name}: settled at ₹${settledPrice.toLocaleString(
-            'en-IN'
-          )} (saving ₹${savings.toLocaleString('en-IN')} off ₹${product.listPrice.toLocaleString(
-            'en-IN'
-          )}).`;
+          const summaryMsg =
+            effectiveMode === 'BULK' || orderQty >= 3
+              ? `Bulk Negotiation complete for ${product.name} (${orderQty} units): settled at ₹${settledPrice.toLocaleString('en-IN')}/unit (Total ₹${(settledPrice * orderQty).toLocaleString('en-IN')}, saving ₹${totalSavings.toLocaleString('en-IN')} off list price).`
+              : `Negotiation complete for ${product.name}: settled at ₹${settledPrice.toLocaleString('en-IN')} (saving ₹${savingsPerUnit.toLocaleString('en-IN')} off ₹${product.listPrice.toLocaleString('en-IN')}).`;
+
           if (autoPlayResponses && voiceEnabled) {
             handlePlaySpeech(workspaceMsgId, summaryMsg);
           }
@@ -676,7 +748,14 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
               ...initialWorkspace,
               status: 'COMPLETED',
               settledPrice,
-              savings,
+              savings: savingsPerUnit,
+              quantity: orderQty,
+              mode: effectiveMode,
+              bulkTier: bulkTierInfo,
+              bulkTotal: settledPrice * orderQty,
+              bulkSavings: totalSavings,
+              collectivePool: matchedPool,
+              totalPaid: settledPrice * orderQty,
               turns,
             },
           };
@@ -695,7 +774,14 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
           ...initialWorkspace,
           status: 'COMPLETED',
           settledPrice,
-          savings,
+          savings: savingsPerUnit,
+          quantity: orderQty,
+          mode: effectiveMode,
+          bulkTier: bulkTierInfo,
+          bulkTotal: settledPrice * orderQty,
+          bulkSavings: totalSavings,
+          collectivePool: matchedPool,
+          totalPaid: settledPrice * orderQty,
           turns,
         },
       }));
@@ -769,6 +855,59 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
   };
 
   /**
+   * Mode 3 Collective Deal: Pledge quantity into group demand pool
+   */
+  const handleConfirmPledge = async () => {
+    if (!activeCollectiveModalPool) return;
+    setIsCollectivePledging(true);
+    setCollectivePledgeSuccess(null);
+    try {
+      const res = await fetch('/api/collective-deals/pledge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          poolId: activeCollectiveModalPool.id,
+          pledgedQty: pledgedQtyInput,
+          userName: currentUser?.displayName || 'DealMate Buyer',
+          userId: currentUser?.uid,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.pool) {
+        setCollectivePools((prev) =>
+          prev.map((p) => (p.id === data.pool.id ? data.pool : p))
+        );
+        setActiveCollectiveModalPool(data.pool);
+        setCollectivePledgeSuccess(
+          `Successfully pledged ${pledgedQtyInput} unit${pledgedQtyInput > 1 ? 's' : ''}! Target group rate ₹${data.pool.collectiveTargetPrice.toLocaleString('en-IN')} locked.`
+        );
+      }
+    } catch {
+      // Optimistic local update
+      const updated: CollectiveDealPool = {
+        ...activeCollectiveModalPool,
+        currentQuantity: activeCollectiveModalPool.currentQuantity + pledgedQtyInput,
+        participantsCount: activeCollectiveModalPool.participantsCount + 1,
+      };
+      if (updated.currentQuantity >= updated.targetQuantity) {
+        updated.status = 'UNLOCKED';
+      }
+      setCollectivePools((prev) =>
+        prev.map((p) => (p.id === updated.id ? updated : p))
+      );
+      setActiveCollectiveModalPool(updated);
+      setCollectivePledgeSuccess(
+        `Successfully pledged ${pledgedQtyInput} unit${pledgedQtyInput > 1 ? 's' : ''}! Target group rate ₹${updated.collectiveTargetPrice.toLocaleString('en-IN')} locked.`
+      );
+    } finally {
+      setIsCollectivePledging(false);
+    }
+  };
+
+  /**
    * Action handler for interactive suggested action pills (Requirement #6 & Conversational Intelligence)
    */
   const handleSuggestedAction = async (action: {
@@ -778,6 +917,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
     productIds?: string[];
     targetPrice?: number;
     choices?: string[];
+    quantity?: number;
   }) => {
     soundEffects.playBlip();
 
@@ -793,6 +933,44 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
           setMobileActiveTab('chat');
         }
         await startInlineProductNegotiation(prod, action.targetPrice);
+      }
+      return;
+    }
+
+    if (action.type === 'START_BULK_NEGOTIATION') {
+      const prod =
+        (action.productId && displayCandidates.find((c) => c.product.id === action.productId)?.product) ||
+        selectedProduct ||
+        displayCandidates[0]?.product;
+
+      if (prod) {
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+          setMobileActiveTab('chat');
+        }
+        const qty = action.quantity || 10;
+        await startInlineProductNegotiation(prod, undefined, qty, 'BULK');
+      }
+      return;
+    }
+
+    if (action.type === 'JOIN_COLLECTIVE_DEAL') {
+      const prod =
+        (action.productId && displayCandidates.find((c) => c.product.id === action.productId)?.product) ||
+        selectedProduct ||
+        displayCandidates[0]?.product;
+
+      const matched = prod
+        ? collectivePools.find(
+            (p) =>
+              (p.productId === prod.id || p.productName.toLowerCase() === prod.name.toLowerCase()) &&
+              p.status === 'ACTIVE'
+          ) || collectivePools[0]
+        : collectivePools[0];
+
+      if (matched) {
+        setActiveCollectiveModalPool(matched);
+        setPledgedQtyInput(1);
+        setCollectivePledgeSuccess(null);
       }
       return;
     }
@@ -2997,6 +3175,126 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
                                         <span>Find Alternatives</span>
                                       </button>
                                     </div>
+
+                                    {/* ADVANCED NEGOTIATION SYSTEM 2.0: Mode 2 Bulk & Mode 3 Collective Options */}
+                                    <div className="space-y-3 pt-3 border-t border-slate-200/50">
+                                      {/* Mode 2: Bulk Quantity Negotiation Prompt Card */}
+                                      {(() => {
+                                        const ws = msg.negotiationWorkspace;
+                                        const product = ws.product;
+                                        const qty = ws.quantity >= 3 ? ws.quantity : 10;
+                                        const currentNormalTotal = ws.settledPrice * qty;
+                                        const bulkUnitPrice = NegotiationEngine.computeBulkUnitPrice(product.listPrice, qty, product, categorySettings);
+                                        const bulkTotal = bulkUnitPrice * qty;
+                                        const bulkSavings = Math.max(0, currentNormalTotal - bulkTotal);
+
+                                        return (
+                                          <div className="p-3.5 rounded-2xl border border-indigo-500/40 bg-gradient-to-r from-indigo-950/30 via-slate-900/40 to-slate-950/40 space-y-2.5">
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                <Package className="w-3.5 h-3.5" /> Bulk Purchase ({qty} units)
+                                              </span>
+                                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                                Volume Tier
+                                              </span>
+                                            </div>
+
+                                            <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                                              &ldquo;You&apos;re already close to my best individual price. Because you&apos;re purchasing {qty} units, I can try a bulk negotiation with the seller.&rdquo;
+                                            </p>
+
+                                            <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                                              <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                                                <div className="text-[10px] text-slate-400">Current Total</div>
+                                                <div className="font-bold text-slate-200">₹{currentNormalTotal.toLocaleString('en-IN')}</div>
+                                              </div>
+                                              <div className="p-2 rounded-xl bg-indigo-950/40 border border-indigo-700/50">
+                                                <div className="text-[10px] text-indigo-300">Potential Target</div>
+                                                <div className="font-bold text-indigo-400">₹{bulkTotal.toLocaleString('en-IN')}</div>
+                                              </div>
+                                              <div className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-700/50">
+                                                <div className="text-[10px] text-emerald-300">Potential Saving</div>
+                                                <div className="font-bold text-emerald-400">₹{bulkSavings.toLocaleString('en-IN')}</div>
+                                              </div>
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => startInlineProductNegotiation(product, bulkUnitPrice, qty, 'BULK')}
+                                              className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-[0.98]"
+                                            >
+                                              <Package className="w-3.5 h-3.5" />
+                                              <span>[ Start Bulk Negotiation ]</span>
+                                            </button>
+                                          </div>
+                                        );
+                                      })()}
+
+                                      {/* Mode 3: Collective / Group Negotiation Card */}
+                                      {(() => {
+                                        const ws = msg.negotiationWorkspace;
+                                        const product = ws.product;
+                                        const matchedPool =
+                                          collectivePools.find(
+                                            (p) =>
+                                              (p.productId === product.id || p.productName.toLowerCase() === product.name.toLowerCase()) &&
+                                              p.status === 'ACTIVE'
+                                          ) ||
+                                          collectivePools.find((p) => p.category === product.category && p.status === 'ACTIVE');
+
+                                        if (!matchedPool) return null;
+
+                                        const pctReached = Math.min(100, Math.round((matchedPool.currentQuantity / matchedPool.targetQuantity) * 100));
+
+                                        return (
+                                          <div className="p-3.5 rounded-2xl border border-purple-500/40 bg-gradient-to-r from-purple-950/30 via-slate-900/40 to-slate-950/40 space-y-2.5">
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-[11px] font-mono font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                <Users className="w-3.5 h-3.5" /> Collective Deal (Group Buy)
+                                              </span>
+                                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                                {matchedPool.participantsCount} Buyers Active
+                                              </span>
+                                            </div>
+
+                                            <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                                              &ldquo;You&apos;ve reached the maximum reasonable individual negotiation. Pool demand with {matchedPool.participantsCount} other buyers to unlock wholesale pricing at ₹{matchedPool.collectiveTargetPrice.toLocaleString('en-IN')}/unit!&rdquo;
+                                            </p>
+
+                                            <div className="space-y-1.5">
+                                              <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                                                <span>Pledged: {matchedPool.currentQuantity} / {matchedPool.targetQuantity} units</span>
+                                                <span className="text-purple-300 font-bold">{pctReached}% ({matchedPool.probabilityScore}% Probability)</span>
+                                              </div>
+                                              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                                                <div
+                                                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all"
+                                                  style={{ width: `${pctReached}%` }}
+                                                />
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-[11px] font-mono pt-1 text-slate-400">
+                                              <span>Group Price: <strong className="text-emerald-400">₹{matchedPool.collectiveTargetPrice.toLocaleString('en-IN')}</strong></span>
+                                              <span>Extra Saving: <strong className="text-purple-300">₹{Math.max(0, ws.settledPrice - matchedPool.collectiveTargetPrice).toLocaleString('en-IN')}/unit</strong></span>
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setActiveCollectiveModalPool(matchedPool);
+                                                setPledgedQtyInput(1);
+                                                setCollectivePledgeSuccess(null);
+                                              }}
+                                              className="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-[0.98]"
+                                            >
+                                              <Users className="w-3.5 h-3.5" />
+                                              <span>[ Join Collective Pool — Lock ₹{matchedPool.collectiveTargetPrice.toLocaleString('en-IN')} ]</span>
+                                            </button>
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -3381,6 +3679,16 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
             comparedProductIds={comparedProductIds}
             onToggleCompare={onCompareToggle}
             onOpenCompareModal={onOpenCompareModal}
+            quantity={negotiationQuantity}
+            onChangeQuantity={setNegotiationQuantity}
+            onStartBulkNegotiate={(cand, qty) => startInlineProductNegotiation(cand.product, undefined, qty, 'BULK')}
+            onJoinCollectiveDeal={(pool) => {
+              setActiveCollectiveModalPool(pool);
+              setPledgedQtyInput(1);
+              setCollectivePledgeSuccess(null);
+            }}
+            activeCollectivePools={collectivePools}
+            categorySettings={categorySettings}
           />
         </aside>
       </div>
@@ -3569,6 +3877,207 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
               >
                 Clear Session
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADVANCED NEGOTIATION SYSTEM 2.0: Mode 3 Collective Deal Modal / Demand Pooling */}
+      {activeCollectiveModalPool && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-lg rounded-3xl border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto ${
+              theme.isLight
+                ? 'bg-white border-slate-200 text-slate-900'
+                : 'bg-[#12161F] border-slate-800 text-white'
+            }`}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display font-bold text-base sm:text-lg">
+                      Collective Deal Pool
+                    </h3>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                      Group Buy 2.0
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Demand pooling unlocks wholesale tier without requiring 10+ single-buyer units.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCollectiveModalPool(null);
+                  setCollectivePledgeSuccess(null);
+                }}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Product Card Overview */}
+            <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+              <img
+                src={activeCollectiveModalPool.productImage}
+                alt={activeCollectiveModalPool.productName}
+                className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-800"
+              />
+              <div className="min-w-0 flex-1">
+                <h4 className="font-bold text-xs sm:text-sm line-clamp-1">
+                  {activeCollectiveModalPool.productName}
+                </h4>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Seller: <strong>{activeCollectiveModalPool.sellerName}</strong>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs line-through text-slate-400 font-mono">
+                    ₹{activeCollectiveModalPool.listPrice.toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-emerald-500">
+                    Target: ₹{activeCollectiveModalPool.collectiveTargetPrice.toLocaleString('en-IN')}/unit
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Save ₹{(activeCollectiveModalPool.listPrice - activeCollectiveModalPool.collectiveTargetPrice).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pool Progress & Thresholds */}
+            <div className="space-y-2 p-3.5 rounded-2xl bg-purple-950/20 border border-purple-500/30">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
+                  Pledged Progress:
+                </span>
+                <span className="font-bold text-purple-300">
+                  {activeCollectiveModalPool.currentQuantity} / {activeCollectiveModalPool.targetQuantity} units ({Math.min(100, Math.round((activeCollectiveModalPool.currentQuantity / activeCollectiveModalPool.targetQuantity) * 100))}%)
+                </span>
+              </div>
+
+              <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden p-0.5">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-400 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, Math.round((activeCollectiveModalPool.currentQuantity / activeCollectiveModalPool.targetQuantity) * 100))}%`,
+                  }}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-mono pt-1 text-slate-300">
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Participants</div>
+                  <div className="font-bold text-purple-300">{activeCollectiveModalPool.participantsCount} Buyers</div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Probability</div>
+                  <div className="font-bold text-emerald-400">{activeCollectiveModalPool.probabilityScore}% High</div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Pool Status</div>
+                  <div className="font-bold text-amber-400">{activeCollectiveModalPool.status}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Seller Profitability & Benefit Guarantee */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
+              <span className="font-mono text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">
+                Seller Profitability & Fulfillment Guarantee:
+              </span>
+              <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+                {activeCollectiveModalPool.sellerBenefitSummary}
+              </p>
+            </div>
+
+            {/* Success Message */}
+            {collectivePledgeSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{collectivePledgeSuccess}</span>
+              </div>
+            )}
+
+            {/* Pledge Units Form */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Select Units to Pledge:
+                </span>
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setPledgedQtyInput((prev) => Math.max(1, prev - 1))}
+                    disabled={pledgedQtyInput <= 1}
+                    className="w-7 h-7 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer shadow-xs"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="w-8 text-center font-mono font-bold text-xs">
+                    {pledgedQtyInput}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPledgedQtyInput((prev) => Math.min(10, prev + 1))}
+                    disabled={pledgedQtyInput >= 10}
+                    className="w-7 h-7 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Price Calculation breakdown */}
+              <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between font-mono text-xs">
+                <span className="text-slate-500 dark:text-slate-400">
+                  Total Order Value ({pledgedQtyInput} unit{pledgedQtyInput > 1 ? 's' : ''}):
+                </span>
+                <div className="text-right">
+                  <span className="font-bold text-slate-900 dark:text-white text-sm">
+                    ₹{(pledgedQtyInput * activeCollectiveModalPool.collectiveTargetPrice).toLocaleString('en-IN')}
+                  </span>
+                  <div className="text-[10px] text-emerald-500 font-bold">
+                    You save ₹{((activeCollectiveModalPool.listPrice - activeCollectiveModalPool.collectiveTargetPrice) * pledgedQtyInput).toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmPledge}
+                  disabled={isCollectivePledging}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-purple-600/20 transition-transform active:scale-[0.98] disabled:opacity-50"
+                >
+                  {isCollectivePledging ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Users className="w-4 h-4" />
+                  )}
+                  <span>Confirm Pledge &amp; Lock Group Rate</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveCollectiveModalPool(null);
+                    setCollectivePledgeSuccess(null);
+                  }}
+                  className="py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
