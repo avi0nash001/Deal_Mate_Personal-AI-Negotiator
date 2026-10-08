@@ -2036,54 +2036,7 @@ Each object in the JSON array MUST have this exact structure:
  * Queries external product feeds (Amazon.in, Flipkart, Croma, Myntra, Reliance Digital) and returns
  * clearly marked 'Retailer' listings (isNegotiable: false) with canonical 'View Product' redirect URLs.
  */
-const SERPAPI_KEY = process.env.SERPAPI_API_KEY;
-const serpCache = new Map<string, { at: number; data: any[] }>();
-const SERP_TTL_MS = 30 * 60 * 1000;
 
-async function searchGoogleShopping(query: string, budget: number) {
-  if (!SERPAPI_KEY) return [];
-
-  const cacheKey = `${query.toLowerCase()}|${budget}`;
-  const cached = serpCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < SERP_TTL_MS) return cached.data;
-
-  const params = new URLSearchParams({
-    engine: 'google_shopping',
-    q: query,
-    gl: 'in',
-    hl: 'en',
-    location: 'India',
-    api_key: SERPAPI_KEY,
-  });
-
-  const res = await fetch(`https://serpapi.com/search.json?${params}`);
-  if (!res.ok) throw new Error(`SerpApi responded ${res.status}`);
-  const json: any = await res.json();
-
-  const products = (json.shopping_results || [])
-    .filter((r: any) => typeof r.extracted_price === 'number')
-    .filter((r: any) => r.extracted_price <= budget * 1.15)
-    .slice(0, 10)
-    .map((r: any, idx: number) => ({
-      id: `serp_${Date.now()}_${idx}`,
-      externalId: `serp_${r.product_id || idx}`,
-      name: r.title,
-      brand: String(r.title || '').split(' ')[0],
-      category: 'Electronics',
-      listPrice: r.extracted_price,
-      marketPrice: r.extracted_price,
-      rating: r.rating ?? 0,
-      reviewsCount: r.reviews ?? 0,
-      marketplaceSource: r.source || 'Google Shopping',
-      description: r.snippet || '',
-      specs: {},
-      image: r.thumbnail,
-      externalUrl: r.product_link || r.link,
-    }));
-
-  serpCache.set(cacheKey, { at: Date.now(), data: products });
-  return products;
-}
 app.post('/api/external-products/fallback-search', async (req, res) => {
   const {
     query = '',
@@ -2093,16 +2046,6 @@ app.post('/api/external-products/fallback-search', async (req, res) => {
     preferredBrands = [],
     requiredFeatures = [],
   } = req.body || {};
-         try {
-       const live = await searchGoogleShopping(String(query || productType), Number(budget) || 2500);
-       if (live.length > 0) {
-         res.json({ products: live, feedSourcesQueried: ['SerpApi Google Shopping (IN)'] });
-         return;
-       }
-     } catch (err) {
-       console.error('SerpApi failed, falling back to static feed:', err);
-     }
-
   const targetBudget = Math.max(300, Number(budget) || 2500);
   const rawQuery = String(query || productType || 'wireless earbuds').trim();
   const brandHint =
