@@ -238,7 +238,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
   return (
     <nav
       aria-label="Primary Navigation"
-      className={`hidden md:flex items-center gap-0.5 lg:gap-1 p-0.5 sm:p-1 rounded-2xl border transition-all shadow-xs max-w-full overflow-x-auto no-scrollbar shrink-0 ${
+      className={`hidden md:flex items-center gap-0.5 lg:gap-1 p-0.5 sm:p-1 rounded-2xl border transition-all shadow-xs shrink-0 ${
         currentTheme.isLight
           ? 'bg-slate-100/90 border-slate-200/90'
           : 'bg-[#141922]/90 border-slate-800'
@@ -363,7 +363,7 @@ export const DesktopNavigation: React.FC<DesktopNavigationProps> = ({
           <div
             role="menu"
             aria-label="Additional sections"
-            className={`absolute left-0 mt-2 w-64 rounded-2xl border p-1.5 shadow-2xl z-50 backdrop-blur-xl ${
+            className={`absolute right-0 mt-2 w-64 rounded-2xl border p-1.5 shadow-2xl z-50 backdrop-blur-xl ${
               currentTheme.isLight
                 ? 'bg-white/98 border-slate-200 text-slate-800 shadow-slate-900/10'
                 : 'bg-[#14191F]/98 border-[#293139] text-slate-100 shadow-black/80'

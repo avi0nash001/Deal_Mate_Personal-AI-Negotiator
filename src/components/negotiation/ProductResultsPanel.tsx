@@ -7,6 +7,7 @@ import {
 } from '../../types';
 import { ThemeConfig } from '../../types/theme';
 import { PriceSparkline } from '../common/PriceSparkline';
+import { CollectiveDealIndicator } from '../common/CollectiveDealIndicator';
 import {
   DealHunterProductCandidate,
   NegotiationWorkspaceData,
@@ -39,7 +40,7 @@ import {
 } from 'lucide-react';
 
 export type ProductSortOption = 'best_match' | 'lowest_price' | 'highest_rating' | 'best_deal';
-export type ProductFilterOption = 'all' | 'negotiable' | 'local' | 'rating_4';
+export type ProductFilterOption = 'all' | 'negotiable' | 'local' | 'rating_4' | 'group_deals';
 export type NegotiatorPanelMode =
   | 'no_search'
   | 'search_results'
@@ -195,6 +196,13 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
 
   // Filter candidates for discovery
   const filteredCandidates = candidates.filter((c) => {
+    if (activeFilter === 'group_deals') {
+      return activeCollectivePools.some(
+        (pool) =>
+          pool.productId === c.product.id ||
+          pool.productName.toLowerCase() === c.product.name.toLowerCase()
+      );
+    }
     if (activeFilter === 'negotiable') return c.eligibleForNegotiation;
     if (activeFilter === 'local') return c.product.isLocalStore || c.sourceLabel === 'Local Stores';
     if (activeFilter === 'rating_4') return c.product.rating >= 4.5;
@@ -1290,8 +1298,25 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
 
         {/* 30-Day Price Trend Sparkline Chart */}
         <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-          <PriceSparkline product={p} height={26} showLabels={false} />
+          <PriceSparkline product={p} height={26} showLabels={false} targetPrice={cand.negotiationTarget} />
         </div>
+
+        {/* Collective Deal Indicator for active group buy opportunities */}
+        {(() => {
+          const matchedPool = activeCollectivePools.find(
+            (pool) =>
+              pool.productId === p.id ||
+              pool.productName.toLowerCase() === p.name.toLowerCase()
+          );
+          if (matchedPool) {
+            return (
+              <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                <CollectiveDealIndicator pool={matchedPool} compact={true} />
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* Key Specifications Bullet Points */}
         <div className="mt-2 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
@@ -1561,6 +1586,7 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
             </span>
             {[
               { id: 'all', label: 'All' },
+              { id: 'group_deals', label: '👥 Group Deals' },
               { id: 'negotiable', label: '🤝 Negotiable' },
               { id: 'local', label: '📍 Local' },
               { id: 'rating_4', label: '★ 4.5+' },

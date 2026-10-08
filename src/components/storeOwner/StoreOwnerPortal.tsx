@@ -44,6 +44,11 @@ import {
   BulkDiscountTier,
   CollectiveDealPool,
 } from '../../types';
+import { AddProductManualModal } from './AddProductManualModal';
+import { ScanProductQRModal } from './ScanProductQRModal';
+import { ProductQRModal } from './ProductQRModal';
+import { AddProductChoiceModal } from './AddProductChoiceModal';
+import { ensureDealMateProductId } from '../../utils/productIdentifier';
 import {
   PRESEEDED_QR_PRODUCTS,
   INITIAL_INCOMING_NEGOTIATIONS,
@@ -142,6 +147,14 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
   const [editName, setEditName] = useState<string>('');
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editStock, setEditStock] = useState<number>(0);
+
+  // New Add Product Modals & QR State
+  const [isChoiceModalOpen, setIsChoiceModalOpen] = useState<boolean>(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState<boolean>(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
+  const [selectedQrProduct, setSelectedQrProduct] = useState<Product | null>(null);
+  const [manualAddPrefill, setManualAddPrefill] = useState<Partial<Product> | undefined>(undefined);
 
   // Incoming Negotiation Requests State
   const [incomingRequests, setIncomingRequests] = useState<IncomingNegotiationRequest[]>(
@@ -535,6 +548,14 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
     );
   };
 
+  const handleAddProductFromModal = async (newProd: Product) => {
+    onAddStoreProduct(newProd);
+    await persistProductToFirestore(newProd);
+    setScanSuccessMessage(
+      `Product "${newProd.name}" (${newProd.dealMateProductId || newProd.id}) added to your store inventory and published live across DealMate!`
+    );
+  };
+
   // Start editing own product
   const handleStartEditProduct = (item: Product) => {
     setEditingProductId(item.id);
@@ -790,6 +811,46 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
       {/* =================================================================== */}
       {activePortalTab === 'inventory' && (
         <div className="space-y-8">
+          {/* Quick Action Bar for Adding Products & Scanning QR */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-cyan-500/5 to-transparent border border-emerald-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xs">
+                <Package className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-sm text-slate-900">
+                  Store Inventory & Product Management
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {mySellerProducts.length} items active · Persistent DealMate QR tags & floor-protected AI bargaining
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setManualAddPrefill(undefined);
+                  setIsManualModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>📝 Add Manually</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsScanModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              >
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span>📷 Scan QR / Barcode</span>
+              </button>
+            </div>
+          </div>
+
           {scanSuccessMessage && (
             <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-2.5 text-xs font-bold">
@@ -1321,27 +1382,94 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
 
           {/* Scoped Seller Inventory Table (Create / Edit / Remove Own Products) */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
                 <Package className="w-5 h-5 text-blue-600" />
                 <h2 className="font-display font-bold text-lg text-slate-900">
                   My Store Inventory ({mySellerProducts.length} Products)
                 </h2>
               </div>
-              <span className="text-xs font-mono text-slate-500">
-                Strict Ownership Scope: You can edit or remove only your own products
-              </span>
+
+              {/* + Add Product Primary Action with Dropdown Options */}
+              <div className="flex items-center gap-2 relative">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddMenuOpen((prev) => !prev)}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.98]"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Add Product</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                        isAddMenuOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {/* Dropdown Options: 1. Add Product Manually, 2. Scan QR / Barcode */}
+                  {isAddMenuOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsAddMenuOpen(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddMenuOpen(false);
+                            setManualAddPrefill(undefined);
+                            setIsManualModalOpen(true);
+                          }}
+                          className="w-full text-left p-2.5 rounded-xl hover:bg-emerald-50 text-slate-900 hover:text-emerald-950 text-xs font-bold flex items-center gap-2.5 cursor-pointer transition-colors"
+                        >
+                          <span className="text-base shrink-0">📝</span>
+                          <div>
+                            <div>1. Add Product Manually</div>
+                            <div className="text-[10px] text-slate-500 font-normal">
+                              Custom MRP, selling price & stock
+                            </div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddMenuOpen(false);
+                            setIsScanModalOpen(true);
+                          }}
+                          className="w-full text-left p-2.5 rounded-xl hover:bg-cyan-50 text-slate-900 hover:text-cyan-950 text-xs font-bold flex items-center gap-2.5 cursor-pointer transition-colors"
+                        >
+                          <span className="text-base shrink-0">📷</span>
+                          <div>
+                            <div>2. Scan QR / Barcode</div>
+                            <div className="text-[10px] text-slate-500 font-normal">
+                              Camera scan or upload shelf tag
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <span className="text-xs font-mono text-slate-500 hidden md:inline">
+                  Strict Ownership Scope
+                </span>
+              </div>
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-xs">
               <table className="w-full text-left text-xs font-mono">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px]">
                   <tr>
-                    <th className="py-3 px-4">Product</th>
+                    <th className="py-3 px-4">Product & DealMate ID</th>
                     <th className="py-3 px-4">Category</th>
                     <th className="py-3 px-4">List Price</th>
                     <th className="py-3 px-4">AI Floor Price</th>
                     <th className="py-3 px-4">Inventory Stock</th>
+                    <th className="py-3 px-4 text-center">QR Code</th>
                     <th className="py-3 px-4 text-right">Manage Product</th>
                   </tr>
                 </thead>
@@ -1354,6 +1482,7 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                       false
                     );
                     const isEditing = editingProductId === item.id;
+                    const persistentId = ensureDealMateProductId(item);
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-50/80">
@@ -1377,7 +1506,12 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                                 {item.name}
                               </div>
                             )}
-                            <div className="text-[10px] text-slate-500">{item.brand}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-slate-500">{item.brand}</span>
+                              <span className="inline-flex items-center gap-0.5 font-mono text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                {persistentId}
+                              </span>
+                            </div>
                           </div>
                         </td>
                         <td className="py-3 px-4 text-slate-700">{item.category}</td>
@@ -1441,6 +1575,17 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                               )}
                             </div>
                           )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedQrProduct(item)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-[11px] font-mono font-bold cursor-pointer transition-colors"
+                            title="View, Download or Print Shelf Tag QR"
+                          >
+                            <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>QR Tag</span>
+                          </button>
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
@@ -1810,6 +1955,48 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
             </button>
           </form>
         </div>
+      )}
+
+      {/* 1. Modal: Add Product Manually */}
+      {isManualModalOpen && (
+        <AddProductManualModal
+          existingProducts={products}
+          sellerId={activeSellerId}
+          sellerName={activeStoreName}
+          storeAddress={profileAddress}
+          categorySettings={categorySettings}
+          onAddProduct={handleAddProductFromModal}
+          initialPrefill={manualAddPrefill}
+          onClose={() => {
+            setIsManualModalOpen(false);
+            setManualAddPrefill(undefined);
+          }}
+        />
+      )}
+
+      {/* 2. Modal: Scan QR / Barcode */}
+      {isScanModalOpen && (
+        <ScanProductQRModal
+          existingProducts={products}
+          onUpdateProductPrice={onUpdateProductPrice}
+          onUpdateProductStock={onUpdateProductStock}
+          onUpdateStoreProduct={onUpdateStoreProduct}
+          onAddStoreProduct={handleAddProductFromModal}
+          onOpenManualAddWithPrefill={(prefill) => {
+            setIsScanModalOpen(false);
+            setManualAddPrefill(prefill);
+            setIsManualModalOpen(true);
+          }}
+          onClose={() => setIsScanModalOpen(false)}
+        />
+      )}
+
+      {/* 3. Modal: View / Download / Print QR Code Shelf Tag */}
+      {selectedQrProduct && (
+        <ProductQRModal
+          product={selectedQrProduct}
+          onClose={() => setSelectedQrProduct(null)}
+        />
       )}
     </div>
   );

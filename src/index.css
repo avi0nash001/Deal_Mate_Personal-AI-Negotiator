@@ -15,9 +15,9 @@ html, body {
 
 :root,
 .theme-pure-white {
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #64748B;
+  --text-primary: #1F2937;
+  --text-secondary: #374151;
+  --text-muted: #4B5563;
   --surface: #FFFFFF;
   --surface-elevated: #F8FAFC;
   --surface-hover: #F1F5F9;
@@ -35,23 +35,113 @@ html, body {
   --dm-border-1: #E2E8F0;
   --dm-border-2: #CBD5E1;
   --dm-border-3: #94A3B8;
-  --dm-text-1: #0F172A;
-  --dm-text-2: #475569;
-  --dm-text-muted: #64748B;
+  --dm-text-1: #1F2937;
+  --dm-text-2: #374151;
+  --dm-text-muted: #4B5563;
   --dm-buyer: #2563EB;
   --dm-seller: #D97706;
   --dm-secured: #16A34A;
 }
 
+/* ==========================================================
+   High-Contrast Text Hierarchy for Light / Pure-White Theme
+   Enforces:
+   - Headings: near-black / dark charcoal (#111827)
+   - Primary text: very dark charcoal (#1F2937)
+   - Secondary text: medium-dark gray (#374151)
+   - Supporting text: darker gray (#4B5563)
+   - Muted text: gray (#6B7280)
+   ========================================================== */
+.theme-pure-white {
+  color: #1F2937;
+  --text-primary: #1F2937;
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+  --heading-primary: #111827;
+  --table-header: #4B5563;
+  --supporting-text: #4B5563;
+}
+
+.theme-pure-white h1,
+.theme-pure-white h2,
+.theme-pure-white h3,
+.theme-pure-white h4,
+.theme-pure-white h5,
+.theme-pure-white h6 {
+  color: #111827;
+}
+
+.theme-pure-white th {
+  color: #4B5563;
+}
+
+.theme-pure-white .text-slate-400,
+.theme-pure-white .text-gray-400,
+.theme-pure-white .text-zinc-400,
+.theme-pure-white .text-neutral-400 {
+  color: #4B5563;
+}
+
+.theme-pure-white .text-slate-500,
+.theme-pure-white .text-gray-500,
+.theme-pure-white .text-zinc-500,
+.theme-pure-white .text-neutral-500 {
+  color: #6B7280;
+}
+
+.theme-pure-white .text-slate-600,
+.theme-pure-white .text-gray-600,
+.theme-pure-white .text-zinc-600,
+.theme-pure-white .text-neutral-600 {
+  color: #374151;
+}
+
+.theme-pure-white .text-slate-700,
+.theme-pure-white .text-gray-700,
+.theme-pure-white .text-zinc-700,
+.theme-pure-white .text-neutral-700 {
+  color: #1F2937;
+}
+
+.theme-pure-white .text-slate-800,
+.theme-pure-white .text-gray-800 {
+  color: #1F2937;
+}
+
+.theme-pure-white nav button span {
+  color: #1F2937;
+}
+
+.theme-pure-white nav button[aria-current="page"] span {
+  color: #1D4ED8;
+}
+
+/* ==========================================================
+   Dark Themes: High-Contrast Readable Hierarchy
+   Enforces:
+   - Primary headings: #F8FAFC
+   - Primary text: #E5E7EB
+   - Secondary/body text: #D1D5DB
+   - Supporting text: #CBD5E1
+   - Muted text: #94A3B8
+   - Table headers: #CBD5E1
+   - Navigation text: #E5E7EB
+   - Disabled/inactive text: #94A3B8
+   ========================================================== */
 .theme-warm-graphite,
 .theme-cyber-indigo,
 .theme-cosmic-nebula,
 .theme-emerald-matrix,
 .theme-titanium-stealth,
 .theme-solar-gold {
-  --text-primary: #F2F5F7;
-  --text-secondary: #AAB3BC;
-  --text-muted: #707A84;
+  color: #E5E7EB;
+  --text-primary: #E5E7EB;
+  --text-secondary: #D1D5DB;
+  --text-muted: #94A3B8;
+  --heading-primary: #F8FAFC;
+  --table-header: #CBD5E1;
+  --supporting-text: #CBD5E1;
+  --disabled-text: #94A3B8;
   --surface: #181D22;
   --surface-elevated: #1E242A;
   --surface-hover: #242B32;
@@ -69,12 +159,82 @@ html, body {
   --dm-border-1: #293139;
   --dm-border-2: #323B44;
   --dm-border-3: #3D4852;
-  --dm-text-1: #F2F5F7;
-  --dm-text-2: #AAB3BC;
-  --dm-text-muted: #707A84;
+  --dm-text-1: #F8FAFC;
+  --dm-text-2: #D1D5DB;
+  --dm-text-muted: #94A3B8;
   --dm-buyer: #4DA3FF;
   --dm-seller: #F2A93B;
   --dm-secured: #35D07F;
+}
+
+/* Dark theme headings */
+.theme-warm-graphite h1, .theme-warm-graphite h2, .theme-warm-graphite h3, .theme-warm-graphite h4, .theme-warm-graphite h5, .theme-warm-graphite h6,
+.theme-cyber-indigo h1, .theme-cyber-indigo h2, .theme-cyber-indigo h3, .theme-cyber-indigo h4, .theme-cyber-indigo h5, .theme-cyber-indigo h6,
+.theme-cosmic-nebula h1, .theme-cosmic-nebula h2, .theme-cosmic-nebula h3, .theme-cosmic-nebula h4, .theme-cosmic-nebula h5, .theme-cosmic-nebula h6,
+.theme-emerald-matrix h1, .theme-emerald-matrix h2, .theme-emerald-matrix h3, .theme-emerald-matrix h4, .theme-emerald-matrix h5, .theme-emerald-matrix h6,
+.theme-titanium-stealth h1, .theme-titanium-stealth h2, .theme-titanium-stealth h3, .theme-titanium-stealth h4, .theme-titanium-stealth h5, .theme-titanium-stealth h6,
+.theme-solar-gold h1, .theme-solar-gold h2, .theme-solar-gold h3, .theme-solar-gold h4, .theme-solar-gold h5, .theme-solar-gold h6 {
+  color: #F8FAFC;
+}
+
+/* Dark theme table headers */
+.theme-warm-graphite th,
+.theme-cyber-indigo th,
+.theme-cosmic-nebula th,
+.theme-emerald-matrix th,
+.theme-titanium-stealth th,
+.theme-solar-gold th {
+  color: #CBD5E1;
+}
+
+/* Dark theme navigation text */
+.theme-warm-graphite nav button span,
+.theme-cyber-indigo nav button span,
+.theme-cosmic-nebula nav button span,
+.theme-emerald-matrix nav button span,
+.theme-titanium-stealth nav button span,
+.theme-solar-gold nav button span {
+  color: #E5E7EB;
+}
+
+/* Dark theme muted text clarity overrides */
+.theme-warm-graphite .text-slate-400,
+.theme-cyber-indigo .text-slate-400,
+.theme-cosmic-nebula .text-slate-400,
+.theme-emerald-matrix .text-slate-400,
+.theme-titanium-stealth .text-slate-400,
+.theme-solar-gold .text-slate-400,
+.theme-warm-graphite .text-gray-400,
+.theme-cyber-indigo .text-gray-400,
+.theme-cosmic-nebula .text-gray-400,
+.theme-emerald-matrix .text-gray-400,
+.theme-titanium-stealth .text-gray-400,
+.theme-solar-gold .text-gray-400 {
+  color: #CBD5E1;
+}
+
+.theme-warm-graphite .text-slate-500,
+.theme-cyber-indigo .text-slate-500,
+.theme-cosmic-nebula .text-slate-500,
+.theme-emerald-matrix .text-slate-500,
+.theme-titanium-stealth .text-slate-500,
+.theme-solar-gold .text-slate-500,
+.theme-warm-graphite .text-gray-500,
+.theme-cyber-indigo .text-gray-500,
+.theme-cosmic-nebula .text-gray-500,
+.theme-emerald-matrix .text-gray-500,
+.theme-titanium-stealth .text-gray-500,
+.theme-solar-gold .text-gray-500 {
+  color: #94A3B8;
+}
+
+.theme-warm-graphite .text-slate-300,
+.theme-cyber-indigo .text-slate-300,
+.theme-cosmic-nebula .text-slate-300,
+.theme-emerald-matrix .text-slate-300,
+.theme-titanium-stealth .text-slate-300,
+.theme-solar-gold .text-slate-300 {
+  color: #CBD5E1;
 }
 
 @utility perspective-800 {

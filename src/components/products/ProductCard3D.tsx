@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Product } from '../../types';
-import { Sparkles, Star, ShieldCheck, Zap, ArrowRight, Layers } from 'lucide-react';
+import { Sparkles, Star, Zap, ArrowRight } from 'lucide-react';
+import { INITIAL_COLLECTIVE_POOLS } from '../../data/catalog';
+import { CollectiveDealIndicator } from '../common/CollectiveDealIndicator';
 
 interface ProductCard3DProps {
   product: Product;
@@ -107,6 +109,23 @@ export const ProductCard3D: React.FC<ProductCard3DProps> = ({
               </span>
             ))}
         </div>
+
+        {/* Collective Deal Indicator for group buy opportunities */}
+        {(() => {
+          const matchedPool = INITIAL_COLLECTIVE_POOLS.find(
+            (p) =>
+              p.productId === product.id ||
+              p.productName.toLowerCase() === product.name.toLowerCase()
+          );
+          if (matchedPool) {
+            return (
+              <div className="mt-3">
+                <CollectiveDealIndicator pool={matchedPool} compact={true} />
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       {/* Pricing & CTA Bottom Row */}

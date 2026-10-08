@@ -1313,6 +1313,7 @@ export default function App() {
               initialProduct={analyzerProduct || products[0]}
               initialNegotiatedPrice={analyzerNegotiatedPrice}
               initialBudget={analyzerTargetBudget}
+              products={products}
               onBuyNow={handleBuySettledProduct}
               onReNegotiate={(prod, prompt, price) => {
                 setNegotiatorInitialProduct(prod);

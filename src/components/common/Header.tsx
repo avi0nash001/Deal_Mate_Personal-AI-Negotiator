@@ -95,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
           : 'bg-[#0E1114]/90 border-b border-[#242C35] text-[#F2F5F7]'
       }`}
     >
-      <div className="max-w-7xl h-full mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
+      <div className="max-w-7xl h-full mx-auto px-4 sm:px-6 lg:px-6 flex items-center justify-between gap-2.5 lg:gap-3">
         {/* 1. DealMate Brand Logo (Left) */}
         <button
           type="button"
@@ -128,7 +128,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         {/* 2. Main Navigation (Center - Desktop & Tablet >= 768px) */}
-        <div className="hidden md:flex flex-1 justify-center min-w-0 mx-2 lg:mx-4">
+        <div className="hidden md:flex flex-1 justify-center shrink-0 min-w-fit mx-1 lg:mx-2">
           <DesktopNavigation
             currentTab={currentTab}
             onNavigate={onNavigate}

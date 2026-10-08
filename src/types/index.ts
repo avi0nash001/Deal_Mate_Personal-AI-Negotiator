@@ -53,6 +53,10 @@ export interface Product {
     | 'Google Search Live'
     | 'Local Store';
   qrCodeData?: string;
+  dealMateProductId?: string; // e.g. "DM-PROD-000127"
+  sku?: string;
+  availabilityStatus?: 'in_stock' | 'out_of_stock' | 'low_stock';
+  discount?: number; // e.g. percentage or fixed discount
   externalUrl?: string;
   externalId?: string;
   isStoreOwnerListed?: boolean;

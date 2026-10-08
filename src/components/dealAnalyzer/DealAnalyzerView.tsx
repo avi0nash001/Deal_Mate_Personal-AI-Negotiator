@@ -28,16 +28,20 @@ import {
   FileText,
   SlidersHorizontal,
 } from 'lucide-react';
-import { Product } from '../../types';
+import { Product, CollectiveDealPool } from '../../types';
 import { ThemeId, THEMES } from '../../types/theme';
 import { DealAnalysisReport, DealImprovementOption, DealVerdict } from '../../types/dealAnalyzer';
 import { DealAnalyzerEngine } from '../../services/dealAnalyzerEngine';
 import { soundEffects } from '../../services/soundEffects';
+import { PRODUCTS, INITIAL_COLLECTIVE_POOLS } from '../../data/catalog';
+import { CollectiveDealIndicator } from '../common/CollectiveDealIndicator';
 
 interface DealAnalyzerViewProps {
   initialProduct?: Product | null;
   initialNegotiatedPrice?: number;
   initialBudget?: number;
+  products?: Product[];
+  activeCollectivePools?: CollectiveDealPool[];
   onBuyNow?: (product: Product, finalPrice: number) => void;
   onReNegotiate?: (product: Product, improvementPrompt: string, basePrice: number) => void;
   onBrowseMoreProducts?: () => void;
@@ -48,6 +52,8 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
   initialProduct,
   initialNegotiatedPrice,
   initialBudget,
+  products,
+  activeCollectivePools,
   onBuyNow,
   onReNegotiate,
   onBrowseMoreProducts,
@@ -55,12 +61,40 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
 }) => {
   const currentTheme = THEMES[currentThemeId] || THEMES['pure-white'];
 
+  const allProducts = products && products.length > 0 ? products : PRODUCTS;
+  const collectivePools = activeCollectivePools || INITIAL_COLLECTIVE_POOLS;
+
+  // Filter state in Deal Analyzer (All, Group Deals, Electronics, Fashion, Local Stores)
+  const [dealFilter, setDealFilter] = useState<'all' | 'group_deals' | 'electronics' | 'fashion' | 'local'>('all');
+
   // Current active product & analysis report state
   const [activeProduct, setActiveProduct] = useState<Product | null>(initialProduct || null);
   const [negotiatedPrice, setNegotiatedPrice] = useState<number | undefined>(initialNegotiatedPrice);
   const [userBudget, setUserBudget] = useState<number>(
     initialBudget || (initialProduct?.listPrice ? Math.round(initialProduct.listPrice * 0.95) : 3000)
   );
+
+  // Active group deal opportunity for currently inspected product
+  const activeProductPool = collectivePools.find(
+    (pool) =>
+      pool.productId === activeProduct?.id ||
+      pool.productName.toLowerCase() === activeProduct?.name.toLowerCase()
+  );
+
+  // Filtered product list for deal analyzer product switcher
+  const filteredProductList = allProducts.filter((p) => {
+    if (dealFilter === 'group_deals') {
+      return collectivePools.some(
+        (pool) =>
+          pool.productId === p.id ||
+          pool.productName.toLowerCase() === p.name.toLowerCase()
+      );
+    }
+    if (dealFilter === 'local') return p.isLocalStore;
+    if (dealFilter === 'electronics') return p.category.toLowerCase().includes('electron');
+    if (dealFilter === 'fashion') return p.category.toLowerCase().includes('fashion');
+    return true;
+  });
 
   const [analysisReport, setAnalysisReport] = useState<DealAnalysisReport | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -291,6 +325,126 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
         </div>
       </div>
 
+      {/* Filter Bar with 'Group Deals' option */}
+      <div
+        className="rounded-2xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+        style={{
+          backgroundColor: 'var(--surface)',
+          borderColor: 'var(--border)',
+        }}
+      >
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          <span className="text-xs font-mono font-bold mr-1" style={{ color: 'var(--text-muted)' }}>
+            Filter Deals:
+          </span>
+          {[
+            { id: 'all', label: 'All Products' },
+            { id: 'group_deals', label: '👥 Group Deals' },
+            { id: 'electronics', label: 'Electronics' },
+            { id: 'fashion', label: 'Fashion' },
+            { id: 'local', label: '📍 Local Stores' },
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setDealFilter(f.id as any)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border ${
+                dealFilter === f.id
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                  : 'hover:bg-slate-500/10'
+              }`}
+              style={
+                dealFilter !== f.id
+                  ? { color: 'var(--text-secondary)', borderColor: 'var(--border)' }
+                  : undefined
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <span className="text-[11px] font-mono text-slate-500 shrink-0">
+          Showing {filteredProductList.length} products
+        </span>
+      </div>
+
+      {/* Group Deals Opportunity Section */}
+      {dealFilter === 'group_deals' && (
+        <div
+          className="p-4 rounded-3xl border space-y-3"
+          style={{
+            backgroundColor: 'rgba(147, 51, 234, 0.04)',
+            borderColor: 'rgba(147, 51, 234, 0.25)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-600" />
+              <h3 className="font-display font-bold text-sm text-purple-950 dark:text-purple-200">
+                Products with Active Collective Demand Opportunities
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-purple-700 dark:text-purple-300 font-bold">
+              {filteredProductList.length} Group Deals Available
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredProductList.map((prod) => {
+              const matchedPool = collectivePools.find(
+                (p) =>
+                  p.productId === prod.id ||
+                  p.productName.toLowerCase() === prod.name.toLowerCase()
+              );
+              const isSelected = activeProduct.id === prod.id;
+
+              return (
+                <div
+                  key={prod.id}
+                  onClick={() => {
+                    setActiveProduct(prod);
+                    setNegotiatedPrice(
+                      matchedPool?.collectiveTargetPrice || Math.round(prod.listPrice * 0.85)
+                    );
+                  }}
+                  className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                    isSelected
+                      ? 'border-purple-500 bg-white dark:bg-slate-900 shadow-md ring-2 ring-purple-500/20'
+                      : 'border-purple-200/60 dark:border-purple-800/40 bg-white/70 dark:bg-slate-900/60 hover:border-purple-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src={prod.image}
+                      alt={prod.name}
+                      referrerPolicy="no-referrer"
+                      className="w-12 h-12 rounded-xl object-cover bg-slate-100 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display font-bold text-xs truncate text-slate-900 dark:text-white">
+                        {prod.name}
+                      </div>
+                      <div className="text-[11px] font-mono font-bold text-purple-700 dark:text-purple-300">
+                        ₹{prod.listPrice.toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                  </div>
+
+                  {matchedPool && (
+                    <CollectiveDealIndicator pool={matchedPool} compact={true} />
+                  )}
+
+                  <div className="text-[10px] font-mono text-right text-purple-600 font-semibold">
+                    {isSelected ? '✓ Currently Analyzing' : 'Click to Analyze Deal →'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 2. Top Analytical Dashboard (Product + Negotiated Price + Deal Value + Verdict) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Product & Negotiation Context Card */}
@@ -332,6 +486,13 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Active Product Collective Deal Opportunity */}
+          {activeProductPool && (
+            <div className="pt-1">
+              <CollectiveDealIndicator pool={activeProductPool} />
+            </div>
+          )}
 
           {/* Pricing Row */}
           <div
