@@ -969,7 +969,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
               disabled={loadingEmail || isSuccess}
             />
 
-            {/* Pre-provisioned Quick Fill Credentials for Testing Roles */}
+            /* {/* Pre-provisioned Quick Fill Credentials for Testing Roles */}
             <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -1025,7 +1025,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
                   </div>
                 </button>
               </div>
-            </div>
+            </div> */
 
             {/* Create New Account CTA */}
             <div className="pt-3 border-t border-slate-100 text-center text-xs text-slate-500">
