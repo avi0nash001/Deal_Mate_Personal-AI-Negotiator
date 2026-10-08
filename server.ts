@@ -2092,7 +2092,7 @@ app.post('/api/external-products/fallback-search', async (req, res) => {
     budget = 2500,
     preferredBrands = [],
     requiredFeatures = [],
-  } = req.body || {
+  } = req.body || {};
          try {
        const live = await searchGoogleShopping(String(query || productType), Number(budget) || 2500);
        if (live.length > 0) {
@@ -2102,7 +2102,6 @@ app.post('/api/external-products/fallback-search', async (req, res) => {
      } catch (err) {
        console.error('SerpApi failed, falling back to static feed:', err);
      }
-  };
 
   const targetBudget = Math.max(300, Number(budget) || 2500);
   const rawQuery = String(query || productType || 'wireless earbuds').trim();
