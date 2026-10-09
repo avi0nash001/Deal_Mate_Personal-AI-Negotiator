@@ -7,11 +7,13 @@ import { CollectiveDealIndicator } from '../common/CollectiveDealIndicator';
 interface ProductCard3DProps {
   product: Product;
   onSelectForNegotiation: (product: Product) => void;
+  onViewDetails?: (product: Product) => void;
 }
 
 export const ProductCard3D: React.FC<ProductCard3DProps> = ({
   product,
   onSelectForNegotiation,
+  onViewDetails,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [rotate, setRotate] = useState({ x: 0, y: 0 });
@@ -63,7 +65,12 @@ export const ProductCard3D: React.FC<ProductCard3DProps> = ({
         </div>
 
         {/* 3D Product Image Container */}
-        <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-slate-900 border border-slate-800/80 mb-4 group-hover:shadow-lg transition-shadow">
+        <div
+          onClick={() => onViewDetails && onViewDetails(product)}
+          className={`relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-slate-900 border border-slate-800/80 mb-4 group-hover:shadow-lg transition-shadow ${
+            onViewDetails ? 'cursor-pointer' : ''
+          }`}
+        >
           <img
             src={product.image}
             alt={product.name}
@@ -88,7 +95,12 @@ export const ProductCard3D: React.FC<ProductCard3DProps> = ({
           <span className="text-slate-400 text-[11px]">{product.sellerName}</span>
         </div>
 
-        <h3 className="font-display font-bold text-base text-white line-clamp-1 group-hover:text-cyan-300 transition-colors">
+        <h3
+          onClick={() => onViewDetails && onViewDetails(product)}
+          className={`font-display font-bold text-base text-white line-clamp-1 group-hover:text-cyan-300 transition-colors ${
+            onViewDetails ? 'cursor-pointer' : ''
+          }`}
+        >
           {product.name}
         </h3>
 

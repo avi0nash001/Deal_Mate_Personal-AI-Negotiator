@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Product } from '../../types';
 import { RecommendationEngine } from '../../services/recommendationEngine';
-import { X, Sparkles, Star, Zap, Check, ArrowRight } from 'lucide-react';
+import { D3PriceTrendChart } from '../common/D3PriceTrendChart';
+import { X, Sparkles, Star, Zap, Check, ArrowRight, LineChart } from 'lucide-react';
 
 interface ProductCompareModalProps {
   isOpen: boolean;
@@ -191,6 +192,25 @@ export const ProductCompareModal: React.FC<ProductCompareModalProps> = ({
                 </tr>
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* D3-based Price Trends Visualization */}
+        {products.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <LineChart className="w-4 h-4 text-cyan-400" />
+              <h3 className="font-display font-bold text-sm text-white">
+                Historical Price Comparison (D3.js)
+              </h3>
+            </div>
+            <D3PriceTrendChart
+              products={products}
+              userBudget={userBudget}
+              height={260}
+              showTimeRangeSelector={true}
+              initialDays={30}
+            />
           </div>
         )}
 

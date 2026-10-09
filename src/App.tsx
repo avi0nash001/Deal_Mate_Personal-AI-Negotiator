@@ -9,6 +9,7 @@ import { LocalStoresView } from './components/stores/LocalStoresView';
 import { ForBusinessView } from './components/business/ForBusinessView';
 import { StreamlinedNegotiator } from './components/negotiation/StreamlinedNegotiator';
 import { ProductCompareModal } from './components/compare/ProductCompareModal';
+import { ProductDetailsModal } from './components/products/ProductDetailsModal';
 import { UserAccountModal, AccountModalTab } from './components/account/UserAccountModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { CheckoutModal } from './components/checkout/CheckoutModal';
@@ -223,6 +224,7 @@ export default function App() {
   ]);
 
   // Modals state
+  const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
@@ -1464,6 +1466,26 @@ export default function App() {
           handleNegotiateProduct(p, Math.round(p.listPrice * 0.8), p.listPrice);
         }}
         onRemoveFromCompare={handleRemoveFromCompare}
+      />
+
+      {/* Product Details Modal with D3 Historical Price Trend Chart */}
+      <ProductDetailsModal
+        isOpen={Boolean(detailsProduct)}
+        onClose={() => setDetailsProduct(null)}
+        product={detailsProduct}
+        onSelectToNegotiate={(p) => {
+          setDetailsProduct(null);
+          handleNegotiateProduct(p, Math.round(p.listPrice * 0.8), p.listPrice);
+        }}
+        onAddToCompare={(p) => {
+          handleToggleCompare(p);
+        }}
+        isInCompare={
+          detailsProduct
+            ? comparedProductIds.includes(detailsProduct.id)
+            : false
+        }
+        userBudget={session.userBudget.maxBudget || 3000}
       />
 
       {/* User Account Modal */}

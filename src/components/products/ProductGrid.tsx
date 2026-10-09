@@ -6,11 +6,13 @@ import { Search, SlidersHorizontal, Sparkles } from 'lucide-react';
 interface ProductGridProps {
   products: Product[];
   onSelectForNegotiation: (product: Product) => void;
+  onViewDetails?: (product: Product) => void;
 }
 
 export const ProductGrid: React.FC<ProductGridProps> = ({
   products,
   onSelectForNegotiation,
+  onViewDetails,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -80,6 +82,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
               key={prod.id}
               product={prod}
               onSelectForNegotiation={onSelectForNegotiation}
+              onViewDetails={onViewDetails}
             />
           ))}
         </div>

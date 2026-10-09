@@ -38,6 +38,12 @@ import {
   ProductFilterOption,
   NegotiatorPanelMode,
 } from './ProductResultsPanel';
+import { D3PriceTrendChart } from '../common/D3PriceTrendChart';
+import { ProductDetailsModal } from '../products/ProductDetailsModal';
+import {
+  parseVoiceNegotiationCommand,
+  speakVoiceFeedback,
+} from '../../services/voiceNegotiationService';
 
 export interface NegotiatorSessionState {
   mode: NegotiatorPanelMode; // 'discovery' | 'negotiation' | 'alternatives'
@@ -240,6 +246,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
   const [pledgedQtyInput, setPledgedQtyInput] = useState<number>(1);
   const [isCollectivePledging, setIsCollectivePledging] = useState<boolean>(false);
   const [collectivePledgeSuccess, setCollectivePledgeSuccess] = useState<string | null>(null);
+  const [inspectedProductForModal, setInspectedProductForModal] = useState<Product | null>(null);
 
   // Sync collective pools from backend API on mount
   useEffect(() => {
@@ -1006,6 +1013,81 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
   };
 
   /**
+   * Verbally update target price during active negotiation sessions
+   */
+  const handleVoiceUpdateTargetPrice = (newTarget: number) => {
+    const prod = sessionState.activeProduct || selectedProduct;
+    if (!prod) return;
+
+    const floor = Math.max(
+      prod.minAcceptablePrice || Math.round(prod.listPrice * 0.75),
+      Math.round(prod.listPrice * 0.75)
+    );
+    const bounded = Math.max(floor, Math.min(prod.listPrice - 50, newTarget));
+
+    setSessionState((prev) => {
+      if (!prev.activeNegotiation) return prev;
+      return {
+        ...prev,
+        activeNegotiation: {
+          ...prev.activeNegotiation,
+          targetPrice: bounded,
+          status: 'NEGOTIATING',
+        },
+      };
+    });
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setConversationHistory((prev) => [
+      ...prev,
+      {
+        id: `msg_voice_target_${Date.now()}`,
+        role: 'user',
+        timestamp: nowTime,
+        text: `🎤 Spoken Command: Updated target price to ₹${bounded.toLocaleString('en-IN')}`,
+        isVoiceTranscript: true,
+      },
+    ]);
+
+    // Rerun negotiation with the newly updated verbal target price
+    startInlineProductNegotiation(prod, bounded);
+  };
+
+  /**
+   * Verbally update max budget ceiling during active negotiation sessions
+   */
+  const handleVoiceUpdateMaxBudget = (newBudget: number) => {
+    const boundedBudget = Math.max(500, newBudget);
+
+    setSessionState((prev) => {
+      if (!prev.activeNegotiation) return prev;
+      return {
+        ...prev,
+        activeNegotiation: {
+          ...prev.activeNegotiation,
+          userBudget: boundedBudget,
+        },
+      };
+    });
+
+    if (preferences) {
+      setPreferences((prev) => (prev ? { ...prev, budget: boundedBudget } : null));
+    }
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setConversationHistory((prev) => [
+      ...prev,
+      {
+        id: `msg_voice_budget_${Date.now()}`,
+        role: 'user',
+        timestamp: nowTime,
+        text: `🎤 Spoken Command: Updated max budget ceiling to ₹${boundedBudget.toLocaleString('en-IN')}`,
+        isVoiceTranscript: true,
+      },
+    ]);
+  };
+
+  /**
    * Unified Multi-Agent Pipeline Handler (used identically by BOTH Text Input AND Voice Input)
    */
   const handleUserSubmission = async (
@@ -1559,6 +1641,28 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
           setTimeout(() => {
             setVoiceState('IDLE');
             setLiveTranscriptPreview('');
+
+            // Active Negotiation Session Voice Command Support
+            const activeProduct = sessionState.activeProduct || selectedProduct;
+            const isInActiveNeg = Boolean(
+              sessionState.mode === 'negotiation' ||
+              (sessionState.activeNegotiation && sessionState.activeNegotiation.status !== 'COMPLETED')
+            );
+
+            if (isInActiveNeg && activeProduct) {
+              const voiceCmd = parseVoiceNegotiationCommand(finalTranscript.trim());
+              if (voiceCmd.type === 'TARGET_PRICE' && voiceCmd.amount) {
+                handleVoiceUpdateTargetPrice(voiceCmd.amount);
+                speakVoiceFeedback(`Target price set to ${voiceCmd.amount} rupees. Updating negotiation.`);
+                return;
+              }
+              if (voiceCmd.type === 'MAX_BUDGET' && voiceCmd.amount) {
+                handleVoiceUpdateMaxBudget(voiceCmd.amount);
+                speakVoiceFeedback(`Max budget set to ${voiceCmd.amount} rupees.`);
+                return;
+              }
+            }
+
             handleUserSubmission(finalTranscript.trim(), true);
           }, 350);
         }
@@ -3689,9 +3793,32 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
             }}
             activeCollectivePools={collectivePools}
             categorySettings={categorySettings}
+            onVoiceUpdateTarget={handleVoiceUpdateTargetPrice}
+            onVoiceUpdateBudget={handleVoiceUpdateMaxBudget}
+            onOpenProductDetails={(prod) => setInspectedProductForModal(prod)}
           />
         </aside>
       </div>
+
+      {/* Product Details Modal with D3 Price Trend Chart */}
+      <ProductDetailsModal
+        isOpen={Boolean(inspectedProductForModal)}
+        onClose={() => setInspectedProductForModal(null)}
+        product={inspectedProductForModal}
+        onSelectToNegotiate={(p) => {
+          setInspectedProductForModal(null);
+          startInlineProductNegotiation(p);
+        }}
+        onAddToCompare={(p) => {
+          if (onCompareToggle) onCompareToggle(p);
+        }}
+        isInCompare={
+          inspectedProductForModal
+            ? comparedProductIds.includes(inspectedProductForModal.id)
+            : false
+        }
+        userBudget={preferences?.budget}
+      />
 
       {/* Deal Analysis Inspection Modal when user clicks "Analyze Deal" */}
       {inspectDealProduct && (
@@ -3759,6 +3886,21 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
                 <span>Potential Savings:</span>
                 <span>₹{inspectDealProduct.estimatedSavings.toLocaleString('en-IN')}</span>
               </div>
+            </div>
+
+            {/* D3 Historical Price Trend Visualization in Inspect Deal Modal */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase">
+                Historical Price Trends (D3.js)
+              </span>
+              <D3PriceTrendChart
+                products={[inspectDealProduct.product]}
+                targetPrice={inspectDealProduct.negotiationTarget}
+                userBudget={preferences?.budget}
+                height={160}
+                showTimeRangeSelector={false}
+                initialDays={30}
+              />
             </div>
 
             <div className="flex items-center gap-2">

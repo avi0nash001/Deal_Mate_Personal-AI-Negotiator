@@ -8,6 +8,8 @@ import {
 import { ThemeConfig } from '../../types/theme';
 import { PriceSparkline } from '../common/PriceSparkline';
 import { CollectiveDealIndicator } from '../common/CollectiveDealIndicator';
+import { D3PriceTrendChart } from '../common/D3PriceTrendChart';
+import { VoiceNegotiationController } from './VoiceNegotiationController';
 import {
   DealHunterProductCandidate,
   NegotiationWorkspaceData,
@@ -90,6 +92,9 @@ interface ProductResultsPanelProps {
   onJoinCollectiveDeal?: (pool: CollectiveDealPool) => void;
   activeCollectivePools?: CollectiveDealPool[];
   categorySettings?: CategoryNegotiationSetting[];
+  onVoiceUpdateTarget?: (newTarget: number) => void;
+  onVoiceUpdateBudget?: (newBudget: number) => void;
+  onOpenProductDetails?: (product: Product) => void;
 }
 
 export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
@@ -134,6 +139,9 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
   onJoinCollectiveDeal,
   activeCollectivePools = INITIAL_COLLECTIVE_POOLS,
   categorySettings = [],
+  onVoiceUpdateTarget,
+  onVoiceUpdateBudget,
+  onOpenProductDetails,
 }) => {
   const [expandedDetailsId, setExpandedDetailsId] = useState<string | null>(null);
 
@@ -475,6 +483,21 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
               </div>
             </div>
 
+            {/* Voice Command Controller for Active Negotiation Sessions */}
+            {onVoiceUpdateTarget && onVoiceUpdateBudget && (
+              <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                <VoiceNegotiationController
+                  currentTargetPrice={targetPrice}
+                  currentMaxBudget={userBudget || currentActiveProduct.listPrice}
+                  floorPrice={activeNegotiation?.floorPrice}
+                  productName={currentActiveProduct.name}
+                  onUpdateTargetPrice={onVoiceUpdateTarget}
+                  onUpdateMaxBudget={onVoiceUpdateBudget}
+                  disabled={isCompleted}
+                />
+              </div>
+            )}
+
             {/* Bullet Specifications */}
             <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
               <div className="flex flex-wrap gap-1.5 text-xs">
@@ -539,6 +562,32 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
                       <span style={{ color: 'var(--text-muted)' }}>Warranty: </span>
                       <strong style={{ color: 'var(--text-primary)' }}>1 Year Verified</strong>
                     </div>
+                  </div>
+
+                  {/* D3-based Historical Price Chart */}
+                  <div className="pt-3 border-t space-y-2" style={{ borderColor: 'var(--border)' }}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-xs" style={{ color: 'var(--accent)' }}>
+                        30-Day Historical Price Trends (D3.js)
+                      </span>
+                      {onOpenProductDetails && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenProductDetails(currentActiveProduct)}
+                          className="text-[11px] font-mono text-cyan-400 hover:underline cursor-pointer"
+                        >
+                          Open Full Details Modal ↗
+                        </button>
+                      )}
+                    </div>
+                    <D3PriceTrendChart
+                      products={[currentActiveProduct]}
+                      targetPrice={targetPrice}
+                      userBudget={userBudget}
+                      height={200}
+                      showTimeRangeSelector={false}
+                      initialDays={30}
+                    />
                   </div>
                 </div>
               )}
