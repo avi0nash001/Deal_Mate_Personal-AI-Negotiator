@@ -89,8 +89,8 @@ export const AddProductChoiceModal: React.FC<AddProductChoiceModalProps> = ({
             className="group p-5 rounded-2xl border-2 border-slate-200 hover:border-cyan-500 bg-slate-50/70 hover:bg-cyan-50/40 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between space-y-3 shadow-xs hover:shadow-md"
           >
             <div className="space-y-2">
-              <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                <QrCode className="w-6 h-6 text-cyan-400" />
+              <div className="w-12 h-12 rounded-xl bg-cyan-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                <QrCode className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-display font-bold text-base text-slate-900 group-hover:text-cyan-950">
                 Scan QR / Barcode

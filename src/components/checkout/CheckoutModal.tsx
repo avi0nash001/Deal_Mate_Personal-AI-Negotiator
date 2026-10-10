@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Product,
   DealToken,
@@ -10,7 +10,13 @@ import {
   priceFloor,
   MAX_SINGLE_ITEM_DISCOUNT,
 } from '../../services/negotiationEngine';
-import { getAuthHeaders } from '../../services/authHeaders';
+import {
+  createBackendOrder,
+  verifyBackendPayment,
+  loadRazorpayScript,
+  fetchRazorpayConfig,
+  RazorpayConfigResponse,
+} from '../../services/razorpayService';
 import {
   X,
   ShieldCheck,
@@ -19,6 +25,10 @@ import {
   CreditCard,
   ArrowRight,
   AlertCircle,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  KeyRound,
 } from 'lucide-react';
 
 interface CheckoutModalProps {
@@ -40,13 +50,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const [quantity, setQuantity] = useState<number>(1);
   const [fullName, setFullName] = useState('Aarav Sharma');
-  const [phone, setPhone] = useState('+91 98765 43210');
+  const [phone, setPhone] = useState('+91 98450 11201');
   const [address, setAddress] = useState('402 Silicon Heights, Outer Ring Road');
   const [city, setCity] = useState('Bengaluru');
   const [postalCode, setPostalCode] = useState('560103');
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CREDIT_CARD' | 'COD'>('UPI');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [missingConfigHelp, setMissingConfigHelp] = useState<boolean>(false);
+  const [razorpayConfig, setRazorpayConfig] = useState<RazorpayConfigResponse | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadRazorpayScript().catch(() => {});
+      fetchRazorpayConfig()
+        .then((cfg) => setRazorpayConfig(cfg))
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -69,45 +91,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isProcessing) return; // Prevent duplicate submission
+
     setOrderError(null);
+    setMissingConfigHelp(false);
     setIsProcessing(true);
+    setProcessingStatus('Validating price floor & creating server order...');
 
     try {
-      // Server-side place_order verification against category_negotiation_settings floor
-      const res = await fetch('/api/orders/place-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({
-          product,
-          unitPrice,
-          quantity,
-          maxSingleDiscountPct,
-          maxBundleDiscountPct,
-          isBundle,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.verified) {
-        setOrderError(
-          data.error ||
-            `Order rejected: unitPrice ₹${unitPrice} is below the store category floor of ₹${effectiveFloor}.`
-        );
-        setIsProcessing(false);
-        return;
-      }
-
-      const orderId = 'ORD-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-      const order: Order = {
-        id: orderId,
-        dealToken,
+      const orderPayload = {
         product,
-        quantity: data.quantity || quantity,
-        totalPaid: data.totalPaid || totalPaid,
-        totalSaved: data.totalSaved || totalSaved,
-        status: 'CONFIRMED',
+        unitPrice,
+        quantity,
+        dealToken,
         shippingAddress: {
           fullName,
           phone,
@@ -116,15 +112,105 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           postalCode,
         },
         paymentMethod,
-        placedAt: Date.now(),
-        estimatedDelivery: `${product.deliveryDays} Business Days`,
+        maxSingleDiscountPct,
+        maxBundleDiscountPct,
+        isBundle,
       };
 
-      setIsProcessing(false);
-      onOrderConfirmed(order);
-      onClose();
+      const backendResponse = await createBackendOrder(orderPayload);
+
+      // Route 1: Cash On Delivery (Instant verified server confirmation)
+      if (backendResponse.isCOD && backendResponse.order) {
+        setIsProcessing(false);
+        onOrderConfirmed(backendResponse.order);
+        onClose();
+        return;
+      }
+
+      // Route 2: Razorpay Online Payment (UPI / Credit Card)
+      if (backendResponse.razorpayOrderId && backendResponse.keyId) {
+        setProcessingStatus('Opening official Razorpay Checkout...');
+
+        const scriptReady = await loadRazorpayScript();
+        if (!scriptReady || typeof window.Razorpay === 'undefined') {
+          throw new Error('Razorpay Checkout SDK could not be loaded in browser. Check your internet connection.');
+        }
+
+        const options = {
+          key: backendResponse.keyId,
+          amount: backendResponse.amount,
+          currency: backendResponse.currency || 'INR',
+          name: 'DealMate AI Shopping Negotiator',
+          description: backendResponse.description || `${product.name} (Locked Deal)`,
+          order_id: backendResponse.razorpayOrderId,
+          prefill: backendResponse.prefill || {
+            name: fullName,
+            contact: phone,
+          },
+          theme: {
+            color: '#10B981', // Emerald theme matching DealMate branding
+          },
+          handler: async (razorpayResponse: {
+            razorpay_payment_id: string;
+            razorpay_order_id: string;
+            razorpay_signature: string;
+          }) => {
+            setProcessingStatus('Verifying cryptographic signature on server...');
+            try {
+              const verifyResult = await verifyBackendPayment({
+                dealmateOrderId: backendResponse.orderId!,
+                razorpayOrderId: razorpayResponse.razorpay_order_id,
+                razorpayPaymentId: razorpayResponse.razorpay_payment_id,
+                razorpaySignature: razorpayResponse.razorpay_signature,
+              });
+
+              if (verifyResult.verified && verifyResult.order) {
+                setIsProcessing(false);
+                onOrderConfirmed(verifyResult.order);
+                onClose();
+              } else {
+                throw new Error(verifyResult.error || 'Cryptographic verification failed.');
+              }
+            } catch (vErr: any) {
+              setOrderError(
+                vErr?.message ||
+                  'Payment was captured by gateway but server verification failed. Please contact support.'
+              );
+              setIsProcessing(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setIsProcessing(false);
+              setProcessingStatus('');
+            },
+          },
+        };
+
+        const rzpInstance = new window.Razorpay(options);
+        rzpInstance.on('payment.failed', (failResp: any) => {
+          const reason =
+            failResp?.error?.description ||
+            failResp?.error?.reason ||
+            'Payment transaction was declined by bank or user.';
+          setOrderError(`Razorpay Payment Failed: ${reason}`);
+          setIsProcessing(false);
+        });
+
+        rzpInstance.open();
+      } else {
+        throw new Error('Server did not return a valid Razorpay order ID.');
+      }
     } catch (err: any) {
-      setOrderError(err?.message || 'Unable to verify order floor price.');
+      const msg = err?.message || 'Failed to complete checkout.';
+      setOrderError(msg);
+      if (
+        msg.includes('RAZORPAY_NOT_CONFIGURED') ||
+        msg.includes('credentials') ||
+        msg.includes('RAZORPAY_KEY_ID')
+      ) {
+        setMissingConfigHelp(true);
+      }
       setIsProcessing(false);
     }
   };
@@ -135,27 +221,57 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          disabled={isProcessing}
+          className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-30"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* Top Header */}
-        <div className="flex items-center gap-2.5 mb-1">
-          <div className="w-8 h-8 rounded-lg bg-emerald-950 border border-emerald-700/60 flex items-center justify-center text-emerald-400">
-            <Lock className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="font-display font-bold text-lg text-white">
-              Checkout & Order Confirmation (place_order Verified)
-            </h2>
-            <div className="flex items-center gap-2 text-xs font-mono text-emerald-400">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>
-                Settled Unit Price: ₹{unitPrice.toLocaleString('en-IN')} · Category Floor: ₹
-                {effectiveFloor.toLocaleString('en-IN')}
-              </span>
+        {/* Top Header & Gateway Status Badge */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-950 border border-emerald-700/60 flex items-center justify-center text-emerald-400">
+              <Lock className="w-4 h-4" />
             </div>
+            <div>
+              <h2 className="font-display font-bold text-lg text-white">
+                Checkout & Secure Payment
+              </h2>
+              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>
+                  Settled Unit Price: ₹{unitPrice.toLocaleString('en-IN')} · Category Floor: ₹
+                  {effectiveFloor.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Real Razorpay Gateway Status Indicator */}
+          <div className="flex items-center gap-2">
+            {razorpayConfig?.isConfigured ? (
+              <div
+                className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 border ${
+                  razorpayConfig.mode === 'live'
+                    ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                    : 'bg-amber-950/80 border-amber-500/60 text-amber-300'
+                }`}
+              >
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    razorpayConfig.mode === 'live' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                  }`}
+                />
+                <span>
+                  Razorpay {razorpayConfig.mode === 'live' ? 'Live Gateway' : 'Test Mode Active'}
+                </span>
+              </div>
+            ) : (
+              <div className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 border bg-slate-900 border-slate-700 text-slate-300">
+                <KeyRound className="w-3 h-3 text-cyan-400" />
+                <span>Razorpay Gateway Ready</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -180,6 +296,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   min={1}
                   max={Math.max(1, product.stock)}
                   value={quantity}
+                  disabled={isProcessing}
                   onChange={(e) =>
                     setQuantity(Math.max(1, Math.min(product.stock || 10, Number(e.target.value) || 1)))
                   }
@@ -202,10 +319,54 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
         </div>
 
+        {/* Error notification */}
         {orderError && (
-          <div className="mt-4 p-3 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>{orderError}</span>
+          <div className="mt-4 p-3.5 rounded-2xl bg-rose-950/70 border border-rose-500/50 text-rose-200 text-xs flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-bold">Transaction Notice</div>
+              <div className="mt-0.5 text-rose-300/90">{orderError}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Missing Razorpay credentials helper banner */}
+        {missingConfigHelp && (
+          <div className="mt-4 p-4 rounded-2xl bg-slate-900/90 border border-cyan-500/40 text-xs space-y-3">
+            <div className="flex items-center gap-2 text-cyan-300 font-bold">
+              <KeyRound className="w-4 h-4" />
+              <span>Razorpay Credentials Setup Guide</span>
+            </div>
+            <p className="text-slate-300 leading-relaxed">
+              DealMate uses the official Razorpay Standard Checkout SDK. To activate live or test card/UPI payments:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-slate-400 font-mono text-[11px]">
+              <li>
+                Log in to <span className="text-cyan-300">dashboard.razorpay.com</span>
+              </li>
+              <li>Toggle the header switch to <strong>Test Mode</strong></li>
+              <li>Go to <strong>Settings &gt; API Keys</strong> and click <strong>Generate Key</strong></li>
+              <li>
+                Add <code className="text-emerald-400">RAZORPAY_KEY_ID</code> and{' '}
+                <code className="text-emerald-400">RAZORPAY_KEY_SECRET</code> to your server environment (.env)
+              </li>
+            </ol>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] text-slate-400">
+                Or select <strong>Cash on Delivery</strong> below to test checkout immediately.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentMethod('COD');
+                  setOrderError(null);
+                  setMissingConfigHelp(false);
+                }}
+                className="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg font-mono text-xs cursor-pointer"
+              >
+                Switch to COD
+              </button>
+            </div>
           </div>
         )}
 
@@ -227,6 +388,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   type="text"
                   required
                   value={fullName}
+                  disabled={isProcessing}
                   onChange={(e) => setFullName(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
                 />
@@ -240,6 +402,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   type="text"
                   required
                   value={phone}
+                  disabled={isProcessing}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
                 />
@@ -253,6 +416,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   type="text"
                   required
                   value={address}
+                  disabled={isProcessing}
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
                 />
@@ -264,6 +428,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   type="text"
                   required
                   value={city}
+                  disabled={isProcessing}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
                 />
@@ -277,6 +442,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   type="text"
                   required
                   value={postalCode}
+                  disabled={isProcessing}
                   onChange={(e) => setPostalCode(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
                 />
@@ -286,40 +452,49 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
           {/* Payment Method Selector */}
           <div>
-            <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Payment Option</span>
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Payment Option (Razorpay Gateway)</span>
+              </h3>
+              <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                INR (₹) Standard Checkout
+              </span>
+            </div>
 
             <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
+                disabled={isProcessing}
                 onClick={() => setPaymentMethod('UPI')}
                 className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                   paymentMethod === 'UPI'
-                    ? 'border-cyan-400 bg-cyan-950/40 text-white shadow-md shadow-cyan-950/40'
+                    ? 'border-emerald-400 bg-emerald-950/40 text-white shadow-md shadow-emerald-950/40'
                     : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
                 }`}
               >
                 <div className="text-xs font-bold font-mono">Instant UPI</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">GPay / PhonePe</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">GPay / PhonePe / Paytm</div>
               </button>
 
               <button
                 type="button"
+                disabled={isProcessing}
                 onClick={() => setPaymentMethod('CREDIT_CARD')}
                 className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                   paymentMethod === 'CREDIT_CARD'
-                    ? 'border-cyan-400 bg-cyan-950/40 text-white shadow-md shadow-cyan-950/40'
+                    ? 'border-emerald-400 bg-emerald-950/40 text-white shadow-md shadow-emerald-950/40'
                     : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
                 }`}
               >
-                <div className="text-xs font-bold font-mono">Card</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Credit / Debit</div>
+                <div className="text-xs font-bold font-mono">Card / NetBanking</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Visa / MC / RuPay</div>
               </button>
 
               <button
                 type="button"
+                disabled={isProcessing}
                 onClick={() => setPaymentMethod('COD')}
                 className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                   paymentMethod === 'COD'
@@ -328,27 +503,43 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 }`}
               >
                 <div className="text-xs font-bold font-mono">Cash on Delivery</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Pay on arrival</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Pay on delivery</div>
               </button>
             </div>
           </div>
 
+          {/* Trust & Security Badges */}
+          <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>256-Bit SSL · RBI Compliant Checkout</span>
+            </div>
+            <div className="text-slate-500">Official Razorpay Integration</div>
+          </div>
+
           {/* Action Row */}
-          <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
+          <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-xs text-slate-400 font-mono">
-              Delivery in {product.deliveryDays} days via Express Carrier
+              Estimated delivery: {product.deliveryDays} business days
             </div>
 
             <button
               type="submit"
               disabled={isProcessing}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer transition-transform transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+              className="w-full sm:w-auto px-7 py-3 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer transition-transform transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
             >
               {isProcessing ? (
-                <span>Verifying Floor & Confirming...</span>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                  <span>{processingStatus || 'Contacting Gateway...'}</span>
+                </>
               ) : (
                 <>
-                  <span>CONFIRM ORDER (₹{totalPaid.toLocaleString('en-IN')})</span>
+                  <span>
+                    {paymentMethod === 'COD'
+                      ? `CONFIRM ORDER (₹${totalPaid.toLocaleString('en-IN')})`
+                      : `PAY NOW VIA RAZORPAY (₹${totalPaid.toLocaleString('en-IN')})`}
+                  </span>
                   <ArrowRight className="w-4 h-4 font-bold" />
                 </>
               )}

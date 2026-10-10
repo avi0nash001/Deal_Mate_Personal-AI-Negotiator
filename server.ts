@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import Razorpay from 'razorpay';
 
 dotenv.config();
 
@@ -13,7 +14,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json({ limit: '25mb' }));
+app.use(
+  express.json({
+    limit: '25mb',
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
 // ============================================================================
 // SERVER-SIDE ROLE-BASED AUTHENTICATION, PASSWORD HASHING & RBAC ENGINE
@@ -1307,10 +1315,620 @@ app.post('/api/collective-deals/create', requireAuth, (req, res) => {
   res.json({ success: true, pool: newPool });
 });
 
+// ============================================================================
+// RAZORPAY PAYMENT GATEWAY INTEGRATION & SECURE VERIFICATION ENGINE
+// ============================================================================
+const RAZORPAY_KEY_ID = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || '').trim();
+const RAZORPAY_KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+const RAZORPAY_WEBHOOK_SECRET = (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
+
+function getRazorpayClient(): Razorpay | null {
+  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+    return null;
+  }
+  return new Razorpay({
+    key_id: RAZORPAY_KEY_ID,
+    key_secret: RAZORPAY_KEY_SECRET,
+  });
+}
+
+export interface ServerOrderRecord {
+  id: string;
+  dealToken: any;
+  product: any;
+  quantity: number;
+  unitPrice: number;
+  totalPaid: number;
+  totalSaved: number;
+  status: 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED';
+  paymentStatus: 'PAID' | 'PAYMENT_PENDING' | 'PAYMENT_FAILED' | 'COD_PENDING';
+  paymentMethod: 'UPI' | 'CREDIT_CARD' | 'COD';
+  shippingAddress: {
+    fullName: string;
+    phone: string;
+    address: string;
+    city: string;
+    postalCode: string;
+  };
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  currency?: string;
+  buyerEmail?: string;
+  buyerUserId?: string;
+  placedAt: number;
+  verifiedAt?: string;
+  estimatedDelivery: string;
+}
+
+const serverOrders = new Map<string, ServerOrderRecord>();
+const processedWebhookEvents = new Set<string>();
+
+// Pre-seed initial historic orders for verified platform accounts
+function seedInitialOrders() {
+  const seedOrders: ServerOrderRecord[] = [
+    {
+      id: 'ORD-HIST-01',
+      dealToken: {
+        id: 'tok_boat_01',
+        productId: 'amz_boat_airdopes_141',
+        originalPrice: 1499,
+        finalPrice: 1249,
+        discountPercent: 16.6,
+        buyerId: 'usr_aarav_01',
+        sellerId: 'amazon_india_api',
+        createdAt: Date.now() - 86400000 * 5,
+        expiresAt: Date.now() + 86400000 * 30,
+        dealHash: 'dh_boat_verified',
+      },
+      product: {
+        id: 'amz_boat_airdopes_141',
+        name: 'boAt Airdopes 141 ANC True Wireless Earbuds',
+        brand: 'boAt',
+        category: 'Electronics',
+        listPrice: 1499,
+        marketPrice: 4490,
+        image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&q=80',
+        sellerName: 'boAt Official Store (Amazon)',
+        sellerId: 'amazon_india_api',
+        deliveryDays: 2,
+        stock: 45,
+      },
+      quantity: 1,
+      unitPrice: 1249,
+      totalPaid: 1249,
+      totalSaved: 250,
+      status: 'CONFIRMED',
+      paymentStatus: 'PAID',
+      paymentMethod: 'UPI',
+      shippingAddress: {
+        fullName: 'Aarav Sharma',
+        phone: '+91 98450 11201',
+        address: '402 Silicon Heights, Outer Ring Road',
+        city: 'Bengaluru',
+        postalCode: '560103',
+      },
+      razorpayOrderId: 'order_seed_001',
+      razorpayPaymentId: 'pay_seed_001',
+      currency: 'INR',
+      buyerEmail: 'aarav.sharma@college.edu.in',
+      buyerUserId: 'usr_aarav_01',
+      placedAt: Date.now() - 86400000 * 5,
+      verifiedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+      estimatedDelivery: '2 Business Days',
+    },
+    {
+      id: 'ORD-HIST-02',
+      dealToken: {
+        id: 'tok_earbuds_02',
+        productId: 'prod_earbuds_01',
+        originalPrice: 2999,
+        finalPrice: 2549,
+        discountPercent: 15,
+        buyerId: 'usr_priya_02',
+        sellerId: 'store_owner_apex_02',
+        createdAt: Date.now() - 86400000 * 3,
+        expiresAt: Date.now() + 86400000 * 30,
+        dealHash: 'dh_apex_verified',
+      },
+      product: {
+        id: 'prod_earbuds_01',
+        name: 'SonicPulse Pro ANC Wireless Earbuds',
+        brand: 'SonicPulse',
+        category: 'Electronics',
+        listPrice: 2999,
+        marketPrice: 4999,
+        image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&q=80',
+        sellerName: 'Apex Sound & Tech Direct (Brigade Rd)',
+        sellerId: 'store_owner_apex_02',
+        deliveryDays: 2,
+        stock: 35,
+      },
+      quantity: 1,
+      unitPrice: 2549,
+      totalPaid: 2549,
+      totalSaved: 450,
+      status: 'PREPARING',
+      paymentStatus: 'PAID',
+      paymentMethod: 'CREDIT_CARD',
+      shippingAddress: {
+        fullName: 'Priya Nair',
+        phone: '+91 98450 22302',
+        address: '12 Indiranagar 100ft Road',
+        city: 'Bengaluru',
+        postalCode: '560038',
+      },
+      razorpayOrderId: 'order_seed_002',
+      razorpayPaymentId: 'pay_seed_002',
+      currency: 'INR',
+      buyerEmail: 'priya.nair@gmail.com',
+      buyerUserId: 'usr_priya_02',
+      placedAt: Date.now() - 86400000 * 3,
+      verifiedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+      estimatedDelivery: '2 Business Days',
+    },
+  ];
+
+  for (const o of seedOrders) {
+    serverOrders.set(o.id, o);
+  }
+}
+
+seedInitialOrders();
+
 /**
- * Final Server-Side Order Price Verification (place_order check)
- * Re-validates that unitPrice >= priceFloor(listPrice, category_negotiation_settings)
- * before an order is confirmed and charged.
+ * GET /api/payments/razorpay-config
+ * Public endpoint to report gateway configuration status, Key ID, and active mode (Test/Live)
+ * without exposing Key Secret or Webhook Secret.
+ */
+app.get('/api/payments/razorpay-config', (_req, res) => {
+  const isConfigured = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
+  const mode = RAZORPAY_KEY_ID.startsWith('rzp_live')
+    ? 'live'
+    : RAZORPAY_KEY_ID.startsWith('rzp_test')
+    ? 'test'
+    : 'unconfigured';
+
+  res.json({
+    keyId: RAZORPAY_KEY_ID,
+    isConfigured,
+    currency: 'INR',
+    mode,
+    merchantName: 'DealMate AI Shopping Negotiator',
+  });
+});
+
+/**
+ * POST /api/payments/create-order
+ * Validates negotiated price against store floor, calculates server-authoritative payable amount,
+ * and creates Razorpay Order with INR currency in subunit paise.
+ */
+app.post('/api/payments/create-order', async (req, res) => {
+  try {
+    const {
+      product,
+      unitPrice,
+      quantity = 1,
+      dealToken,
+      shippingAddress,
+      maxSingleDiscountPct,
+      maxBundleDiscountPct,
+      isBundle = false,
+      paymentMethod = 'UPI',
+    } = req.body || {};
+
+    if (!product || typeof product.listPrice !== 'number' || typeof unitPrice !== 'number') {
+      res.status(400).json({ error: 'Valid product with listPrice and unitPrice is required.' });
+      return;
+    }
+
+    if (!shippingAddress || !shippingAddress.fullName || !shippingAddress.address) {
+      res.status(400).json({ error: 'Complete shipping address is required.' });
+      return;
+    }
+
+    const discountPct = isBundle ? maxBundleDiscountPct : maxSingleDiscountPct;
+    const minAllowedFloor = computePriceFloor(product.listPrice, discountPct, isBundle);
+
+    if (Math.round(unitPrice) < minAllowedFloor) {
+      res.status(400).json({
+        verified: false,
+        error: `Order rejected by server price-floor check: negotiated unitPrice ₹${unitPrice} is below the authorized category floor of ₹${minAllowedFloor}.`,
+        minAllowedFloor,
+      });
+      return;
+    }
+
+    const finalUnitPrice = Math.round(unitPrice);
+    const finalQty = Math.max(1, Math.floor(Number(quantity) || 1));
+    const totalAmountINR = finalUnitPrice * finalQty;
+    const totalSavedINR = Math.max(0, (product.listPrice - finalUnitPrice) * finalQty);
+
+    const authenticatedUser = getAuthenticatedAccount(req);
+    const buyerEmail = authenticatedUser?.email || req.body?.buyerEmail || '';
+    const buyerUserId = authenticatedUser?.uid || req.body?.buyerUserId || '';
+
+    // Cash on Delivery (COD) route
+    if (paymentMethod === 'COD') {
+      const orderId = 'ORD-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+      const orderRecord: ServerOrderRecord = {
+        id: orderId,
+        dealToken: dealToken || { originalPrice: product.listPrice, finalPrice: finalUnitPrice },
+        product,
+        quantity: finalQty,
+        unitPrice: finalUnitPrice,
+        totalPaid: totalAmountINR,
+        totalSaved: totalSavedINR,
+        status: 'CONFIRMED',
+        paymentStatus: 'COD_PENDING',
+        paymentMethod: 'COD',
+        shippingAddress,
+        placedAt: Date.now(),
+        estimatedDelivery: `${product.deliveryDays || 3} Business Days`,
+        buyerEmail,
+        buyerUserId,
+      };
+
+      serverOrders.set(orderId, orderRecord);
+      res.json({
+        success: true,
+        isCOD: true,
+        order: orderRecord,
+      });
+      return;
+    }
+
+    // Razorpay Online Payment (UPI / Card)
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      res.status(503).json({
+        error:
+          'Razorpay payment gateway credentials (RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET) are not configured on the server. Please set them in your server environment to process live/test payments.',
+        code: 'RAZORPAY_NOT_CONFIGURED',
+        docsHelp:
+          'Obtain API keys in Razorpay Dashboard > Settings > API Keys. Use Test Mode Key ID (rzp_test_...) and Key Secret.',
+      });
+      return;
+    }
+
+    const rzp = getRazorpayClient();
+    if (!rzp) {
+      res.status(500).json({ error: 'Failed to initialize Razorpay SDK client.' });
+      return;
+    }
+
+    const amountInPaise = totalAmountINR * 100;
+    const receiptId = `rcpt_${Date.now().toString(36)}_${crypto.randomBytes(3).toString('hex')}`;
+
+    const razorpayOrder = await rzp.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: receiptId,
+      notes: {
+        productId: String(product.id),
+        productName: String(product.name || '').slice(0, 40),
+        unitPrice: String(finalUnitPrice),
+        quantity: String(finalQty),
+        buyerEmail: String(buyerEmail || shippingAddress.fullName || ''),
+        buyerPhone: String(shippingAddress.phone || ''),
+      },
+    });
+
+    const orderId = 'ORD-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    const orderRecord: ServerOrderRecord = {
+      id: orderId,
+      dealToken: dealToken || { originalPrice: product.listPrice, finalPrice: finalUnitPrice },
+      product,
+      quantity: finalQty,
+      unitPrice: finalUnitPrice,
+      totalPaid: totalAmountINR,
+      totalSaved: totalSavedINR,
+      status: 'PREPARING',
+      paymentStatus: 'PAYMENT_PENDING',
+      paymentMethod,
+      shippingAddress,
+      razorpayOrderId: razorpayOrder.id,
+      currency: razorpayOrder.currency,
+      placedAt: Date.now(),
+      estimatedDelivery: `${product.deliveryDays || 3} Business Days`,
+      buyerEmail,
+      buyerUserId,
+    };
+
+    serverOrders.set(orderId, orderRecord);
+
+    res.json({
+      success: true,
+      orderId,
+      razorpayOrderId: razorpayOrder.id,
+      amount: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      keyId: RAZORPAY_KEY_ID,
+      productName: product.name,
+      description: `DealMate Order ${orderId} · ${product.name}`,
+      prefill: {
+        name: shippingAddress.fullName,
+        contact: shippingAddress.phone,
+        email: buyerEmail,
+      },
+    });
+  } catch (err: any) {
+    console.error('Error in /api/payments/create-order:', err);
+    res.status(500).json({
+      error: err?.message || 'Server error while creating Razorpay order.',
+    });
+  }
+});
+
+/**
+ * POST /api/payments/verify-payment
+ * Server-side cryptographic HMAC-SHA256 signature verification & Razorpay API status reconciliation.
+ * Updates order to CONFIRMED / PAID only after trusted verification.
+ */
+app.post('/api/payments/verify-payment', async (req, res) => {
+  try {
+    const { dealmateOrderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body || {};
+
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      res.status(400).json({
+        verified: false,
+        error: 'Missing required Razorpay payment verification parameters.',
+      });
+      return;
+    }
+
+    if (!RAZORPAY_KEY_SECRET) {
+      res.status(503).json({
+        verified: false,
+        error: 'Server is missing RAZORPAY_KEY_SECRET. Cannot verify payment signature.',
+        code: 'RAZORPAY_SECRET_MISSING',
+      });
+      return;
+    }
+
+    // Find the DealMate order
+    let order: ServerOrderRecord | undefined;
+    if (dealmateOrderId) {
+      order = serverOrders.get(dealmateOrderId);
+    }
+    if (!order) {
+      for (const ord of serverOrders.values()) {
+        if (ord.razorpayOrderId === razorpayOrderId) {
+          order = ord;
+          break;
+        }
+      }
+    }
+
+    if (!order) {
+      res.status(404).json({
+        verified: false,
+        error: 'DealMate order record not found for this transaction.',
+      });
+      return;
+    }
+
+    // Idempotency: If order was already verified and marked PAID, return existing verified order
+    if (order.paymentStatus === 'PAID' && order.razorpayPaymentId === razorpayPaymentId) {
+      res.json({
+        verified: true,
+        order,
+        alreadyVerified: true,
+      });
+      return;
+    }
+
+    // Step 1: Cryptographic HMAC SHA256 Signature Verification
+    const expectedSignature = crypto
+      .createHmac('sha256', RAZORPAY_KEY_SECRET)
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+
+    let isSignatureValid = false;
+    try {
+      const expBuf = Buffer.from(expectedSignature, 'utf8');
+      const actBuf = Buffer.from(String(razorpaySignature), 'utf8');
+      if (expBuf.length === actBuf.length) {
+        isSignatureValid = crypto.timingSafeEqual(expBuf, actBuf);
+      }
+    } catch {
+      isSignatureValid = false;
+    }
+
+    if (!isSignatureValid) {
+      order.paymentStatus = 'PAYMENT_FAILED';
+      res.status(400).json({
+        verified: false,
+        error: 'Cryptographic signature mismatch. Forged or corrupted payment payload.',
+        code: 'INVALID_SIGNATURE',
+      });
+      return;
+    }
+
+    // Step 2: Live Payment Status Verification via Razorpay REST API
+    const rzp = getRazorpayClient();
+    if (rzp) {
+      try {
+        const paymentRecord: any = await rzp.payments.fetch(razorpayPaymentId);
+        if (paymentRecord.order_id !== razorpayOrderId) {
+          order.paymentStatus = 'PAYMENT_FAILED';
+          res.status(400).json({
+            verified: false,
+            error: 'Razorpay payment order_id does not match DealMate order reference.',
+          });
+          return;
+        }
+
+        if (paymentRecord.status !== 'captured' && paymentRecord.status !== 'authorized') {
+          order.paymentStatus = 'PAYMENT_FAILED';
+          res.status(400).json({
+            verified: false,
+            error: `Payment not completed. Current Razorpay status is "${paymentRecord.status}".`,
+          });
+          return;
+        }
+      } catch (rzpErr: any) {
+        console.warn('Could not query Razorpay payments.fetch:', rzpErr?.message);
+        // Signature verification passed; proceed with caution if network had a glitch
+      }
+    }
+
+    // Step 3: Transition Order to Verified PAID state
+    order.status = 'CONFIRMED';
+    order.paymentStatus = 'PAID';
+    order.razorpayPaymentId = razorpayPaymentId;
+    order.razorpaySignature = razorpaySignature;
+    order.verifiedAt = new Date().toISOString();
+    serverOrders.set(order.id, order);
+
+    // Update buyer telemetry if account exists
+    if (order.buyerEmail) {
+      const acc = serverAccounts.get(order.buyerEmail.toLowerCase());
+      if (acc) {
+        acc.totalSpent = (acc.totalSpent || 0) + order.totalPaid;
+        acc.totalSaved = (acc.totalSaved || 0) + order.totalSaved;
+        acc.negotiationsCount = (acc.negotiationsCount || 0) + 1;
+        serverAccounts.set(order.buyerEmail.toLowerCase(), acc);
+      }
+    }
+
+    res.json({
+      verified: true,
+      order,
+    });
+  } catch (err: any) {
+    console.error('Error in /api/payments/verify-payment:', err);
+    res.status(500).json({
+      verified: false,
+      error: err?.message || 'Server error during payment verification.',
+    });
+  }
+});
+
+/**
+ * POST /api/payments/razorpay-webhook
+ * Reconciles async payment events (payment.captured, payment.failed, order.paid)
+ * using raw request body HMAC-SHA256 signature verification and idempotent processing.
+ */
+app.post('/api/payments/razorpay-webhook', (req, res) => {
+  try {
+    const signature = req.headers['x-razorpay-signature'] as string;
+    if (!signature) {
+      res.status(400).json({ error: 'Missing x-razorpay-signature header.' });
+      return;
+    }
+
+    if (!RAZORPAY_WEBHOOK_SECRET) {
+      console.warn('RAZORPAY_WEBHOOK_SECRET not set in environment.');
+      res.status(503).json({ error: 'RAZORPAY_WEBHOOK_SECRET is not configured on this server.' });
+      return;
+    }
+
+    const rawBodyBuffer = (req as any).rawBody || Buffer.from(JSON.stringify(req.body));
+    const expectedSignature = crypto
+      .createHmac('sha256', RAZORPAY_WEBHOOK_SECRET)
+      .update(rawBodyBuffer)
+      .digest('hex');
+
+    const expBuf = Buffer.from(expectedSignature, 'utf8');
+    const actBuf = Buffer.from(signature, 'utf8');
+    const isValid = expBuf.length === actBuf.length && crypto.timingSafeEqual(expBuf, actBuf);
+
+    if (!isValid) {
+      res.status(400).json({ error: 'Invalid webhook signature.' });
+      return;
+    }
+
+    const event = req.body;
+    const eventId = event?.id || `${event?.event}_${event?.created_at}`;
+
+    // Idempotency: Skip repeated webhook deliveries
+    if (eventId && processedWebhookEvents.has(eventId)) {
+      res.json({ status: 'ok', message: 'Event already processed.' });
+      return;
+    }
+    if (eventId) {
+      processedWebhookEvents.add(eventId);
+    }
+
+    const eventType = event?.event;
+    if (eventType === 'payment.captured' || eventType === 'order.paid') {
+      const p = event?.payload?.payment?.entity;
+      const rzpOrderId = p?.order_id || event?.payload?.order?.entity?.id;
+      for (const ord of serverOrders.values()) {
+        if (ord.razorpayOrderId === rzpOrderId) {
+          ord.paymentStatus = 'PAID';
+          ord.status = 'CONFIRMED';
+          if (p?.id) ord.razorpayPaymentId = p.id;
+          ord.verifiedAt = new Date().toISOString();
+          break;
+        }
+      }
+    } else if (eventType === 'payment.failed') {
+      const p = event?.payload?.payment?.entity;
+      const rzpOrderId = p?.order_id;
+      for (const ord of serverOrders.values()) {
+        if (ord.razorpayOrderId === rzpOrderId) {
+          ord.paymentStatus = 'PAYMENT_FAILED';
+          break;
+        }
+      }
+    }
+
+    res.json({ status: 'ok' });
+  } catch (err: any) {
+    console.error('Error in /api/payments/razorpay-webhook:', err);
+    res.status(500).json({ error: 'Webhook processing error.' });
+  }
+});
+
+/**
+ * GET /api/orders
+ * Returns orders with verified payment status for the current user, store owner, or admin.
+ */
+app.get('/api/orders', (req, res) => {
+  const acc = getAuthenticatedAccount(req);
+  const all = Array.from(serverOrders.values()).sort((a, b) => b.placedAt - a.placedAt);
+
+  if (!acc) {
+    res.json({ orders: all });
+    return;
+  }
+
+  if (acc.role === 'admin') {
+    res.json({ orders: all });
+    return;
+  }
+
+  if (acc.role === 'store_owner') {
+    const storeOrders = all.filter(
+      (o) =>
+        o.product?.sellerId === acc.uid ||
+        (acc.storeName && o.product?.sellerName?.toLowerCase().includes(acc.storeName.toLowerCase()))
+    );
+    res.json({ orders: storeOrders.length > 0 ? storeOrders : all });
+    return;
+  }
+
+  const userOrders = all.filter(
+    (o) => o.buyerUserId === acc.uid || o.buyerEmail?.toLowerCase() === acc.email.toLowerCase()
+  );
+  res.json({ orders: userOrders });
+});
+
+/**
+ * GET /api/orders/:id
+ */
+app.get('/api/orders/:id', (req, res) => {
+  const order = serverOrders.get(req.params.id);
+  if (!order) {
+    res.status(404).json({ error: 'Order not found.' });
+    return;
+  }
+  res.json({ order });
+});
+
+/**
+ * Final Server-Side Order Price Verification (place_order check) - Backwards Compatible
  */
 app.post('/api/orders/place-order', requireAuth, (req, res) => {
   const {

@@ -337,6 +337,14 @@ export interface Order {
     postalCode: string;
   };
   paymentMethod: 'UPI' | 'CREDIT_CARD' | 'COD';
+  paymentStatus?: 'PAID' | 'PAYMENT_PENDING' | 'PAYMENT_FAILED' | 'COD_PENDING';
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  currency?: string;
+  buyerEmail?: string;
+  buyerUserId?: string;
+  verifiedAt?: string;
   placedAt: number;
   estimatedDelivery: string;
 }

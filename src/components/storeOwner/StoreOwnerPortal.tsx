@@ -44,6 +44,7 @@ import {
   BulkDiscountTier,
   CollectiveDealPool,
 } from '../../types';
+import { ThemeId, THEMES } from '../../types/theme';
 import { AddProductManualModal } from './AddProductManualModal';
 import { ScanProductQRModal } from './ScanProductQRModal';
 import { ProductQRModal } from './ProductQRModal';
@@ -86,6 +87,7 @@ interface StoreOwnerPortalProps {
   onOpenAuthModal: () => void;
   onSignOut?: () => void;
   onNavigateToSearch: (query?: string) => void;
+  currentThemeId?: ThemeId;
 }
 
 const SUGGESTED_CATEGORIES = [
@@ -114,7 +116,11 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
   onOpenAuthModal,
   onSignOut,
   onNavigateToSearch,
+  currentThemeId = 'pure-white',
 }) => {
+  const currentTheme = THEMES[currentThemeId] || THEMES['pure-white'];
+  const isLight = currentTheme.isLight;
+
   const [activePortalTab, setActivePortalTab] = useState<
     'inventory' | 'negotiations' | 'sales' | 'store_profile'
   >('inventory');
@@ -648,18 +654,57 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
   return (
     <div className="space-y-7 max-w-7xl mx-auto">
       {/* Top Store Owner Header Banner */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-950 text-white border border-emerald-500/30 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-        <div className="space-y-2 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-mono font-bold uppercase">
-            <Store className="w-3.5 h-3.5" />
+      <div
+        className={`p-6 sm:p-8 rounded-3xl transition-all duration-300 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 ${
+          isLight
+            ? 'bg-gradient-to-r from-blue-50/80 via-white to-sky-50/70 border border-blue-200/60 shadow-sm text-slate-900'
+            : 'bg-surface border border-[var(--border)] text-[var(--text-primary)] shadow-xl'
+        }`}
+      >
+        <div className="space-y-2.5 max-w-2xl">
+          {/* Role and Store ID badge with light blue background, blue text and subtle border */}
+          <div
+            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold uppercase transition-colors ${
+              isLight
+                ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                : 'bg-blue-950/60 border border-blue-500/30 text-blue-300'
+            }`}
+          >
+            <Store className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
             <span>
               Shop Owner Dashboard · Role: SHOP_OWNER · ID: {activeSellerId}
             </span>
           </div>
-          <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-white">
-            {activeStoreName}
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+
+          <div>
+            {/* Store name: dark navy and clearly visible in light mode */}
+            <h1
+              className={`font-display font-extrabold text-2xl sm:text-3xl tracking-tight transition-colors ${
+                isLight ? 'text-[#0f172a]' : 'text-white'
+              }`}
+            >
+              {activeStoreName}
+            </h1>
+
+            {/* Store location */}
+            <div
+              className={`flex items-center gap-1.5 text-xs font-medium mt-1 ${
+                isLight ? 'text-slate-500' : 'text-slate-400'
+              }`}
+            >
+              <MapPin className={`w-3.5 h-3.5 shrink-0 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+              <span>
+                {profileAddress || currentUser?.storeAddress || '100ft Road, Indiranagar, Bengaluru 560038'}
+              </span>
+            </div>
+          </div>
+
+          {/* Store description readable in medium grey */}
+          <p
+            className={`text-xs sm:text-sm leading-relaxed ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
             Create, edit, and manage your store inventory, respond to incoming buyer AI
             negotiation offers, configure per-category discount floors, and manage your
             store profile.
@@ -670,25 +715,41 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
           {!currentUser && (
             <button
               onClick={onOpenAuthModal}
-              className="px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-lg"
+              className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer transition-all ${
+                isLight
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-xs'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg'
+              }`}
             >
               <Store className="w-4 h-4" />
               <span>Sign In as Shop Owner</span>
             </button>
           )}
+
+          {/* Light button with blue border and blue text for View in AI Deal Analyzer */}
           <button
             onClick={() => onNavigateToSearch()}
-            className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center gap-2 cursor-pointer"
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer transition-all ${
+              isLight
+                ? 'bg-white hover:bg-blue-50/80 border border-blue-200 text-blue-700 shadow-xs'
+                : 'bg-white/10 hover:bg-white/20 border border-white/20 text-white'
+            }`}
           >
-            <Search className="w-4 h-4 text-cyan-400" />
+            <Search className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
             <span>View in AI Deal Analyzer</span>
           </button>
+
+          {/* Sign Out with light pink background and subtle pink/red border */}
           {currentUser && onSignOut && (
             <button
               onClick={onSignOut}
-              className="px-3.5 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/30 text-rose-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+              className={`px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all ${
+                isLight
+                  ? 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 shadow-xs'
+                  : 'bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/30 text-rose-200'
+              }`}
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className={`w-3.5 h-3.5 ${isLight ? 'text-rose-600' : 'text-rose-400'}`} />
               <span>Sign Out</span>
             </button>
           )}
@@ -697,18 +758,35 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
 
       {/* Store Owner KPI Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+        <div
+          className={`p-4 rounded-2xl border transition-all ${
+            isLight
+              ? 'bg-white border-slate-200 shadow-xs'
+              : 'bg-surface border-[var(--border)] shadow-lg'
+          }`}
+        >
           <div className="text-[11px] font-mono uppercase text-slate-500">
             My Store Products
           </div>
-          <div className="text-2xl font-extrabold font-mono text-slate-900 mt-1">
+          <div
+            className={`text-2xl font-extrabold font-mono mt-1 ${
+              isLight ? 'text-[#0f172a]' : 'text-white'
+            }`}
+          >
             {mySellerProducts.length}
           </div>
           <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">
             Scoped to {activeSellerId}
           </div>
         </div>
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+
+        <div
+          className={`p-4 rounded-2xl border transition-all ${
+            isLight
+              ? 'bg-white border-slate-200 shadow-xs'
+              : 'bg-surface border-[var(--border)] shadow-lg'
+          }`}
+        >
           <div className="text-[11px] font-mono uppercase text-slate-500">
             Incoming Offer Requests
           </div>
@@ -722,7 +800,14 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
             Accept, reject, or counter
           </div>
         </div>
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+
+        <div
+          className={`p-4 rounded-2xl border transition-all ${
+            isLight
+              ? 'bg-white border-slate-200 shadow-xs'
+              : 'bg-surface border-[var(--border)] shadow-lg'
+          }`}
+        >
           <div className="text-[11px] font-mono uppercase text-slate-500">
             AI Deals & Orders Closed
           </div>
@@ -733,11 +818,22 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
             Verified store transactions
           </div>
         </div>
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+
+        <div
+          className={`p-4 rounded-2xl border transition-all ${
+            isLight
+              ? 'bg-white border-slate-200 shadow-xs'
+              : 'bg-surface border-[var(--border)] shadow-lg'
+          }`}
+        >
           <div className="text-[11px] font-mono uppercase text-slate-500">
             Store Revenue (GMV)
           </div>
-          <div className="text-2xl font-extrabold font-mono text-slate-900 mt-1">
+          <div
+            className={`text-2xl font-extrabold font-mono mt-1 ${
+              isLight ? 'text-[#0f172a]' : 'text-white'
+            }`}
+          >
             ₹{storeRevenue.toLocaleString('en-IN')}
           </div>
           <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">
@@ -747,17 +843,27 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
       </div>
 
       {/* Sub-Navigation Tabs for Shop Owner */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
+      <div
+        className={`flex flex-wrap items-center gap-2 p-1.5 rounded-2xl border transition-colors ${
+          isLight
+            ? 'bg-slate-100 border-slate-200'
+            : 'bg-[var(--dm-surface-2)] border-[var(--border)]'
+        }`}
+      >
         <button
           type="button"
           onClick={() => setActivePortalTab('inventory')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
             activePortalTab === 'inventory'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? isLight
+                ? 'bg-white text-blue-700 shadow-xs border border-slate-200'
+                : 'bg-blue-600 text-white shadow-xs'
+              : isLight
+              ? 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Package className="w-4 h-4 text-emerald-400" />
+          <Package className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-emerald-400'}`} />
           <span>Inventory, Products & Floor Rules ({mySellerProducts.length})</span>
         </button>
 
@@ -766,14 +872,18 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
           onClick={() => setActivePortalTab('negotiations')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
             activePortalTab === 'negotiations'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? isLight
+                ? 'bg-white text-blue-700 shadow-xs border border-slate-200'
+                : 'bg-blue-600 text-white shadow-xs'
+              : isLight
+              ? 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          <MessageSquare className="w-4 h-4 text-amber-400" />
+          <MessageSquare className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
           <span>Incoming Negotiation Requests</span>
           {pendingRequestsCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-mono font-extrabold">
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-mono font-extrabold">
               {pendingRequestsCount}
             </span>
           )}
@@ -784,11 +894,15 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
           onClick={() => setActivePortalTab('sales')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
             activePortalTab === 'sales'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? isLight
+                ? 'bg-white text-blue-700 shadow-xs border border-slate-200'
+                : 'bg-blue-600 text-white shadow-xs'
+              : isLight
+              ? 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          <ShoppingBag className="w-4 h-4 text-blue-400" />
+          <ShoppingBag className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
           <span>Store Sales & Orders ({mySalesRecords.length})</span>
         </button>
 
@@ -797,11 +911,15 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
           onClick={() => setActivePortalTab('store_profile')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
             activePortalTab === 'store_profile'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? isLight
+                ? 'bg-white text-blue-700 shadow-xs border border-slate-200'
+                : 'bg-blue-600 text-white shadow-xs'
+              : isLight
+              ? 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Store className="w-4 h-4 text-cyan-400" />
+          <Store className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
           <span>Manage Store Profile</span>
         </button>
       </div>
@@ -812,16 +930,30 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
       {activePortalTab === 'inventory' && (
         <div className="space-y-8">
           {/* Quick Action Bar for Adding Products & Scanning QR */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-cyan-500/5 to-transparent border border-emerald-500/20">
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border transition-all ${
+              isLight
+                ? 'bg-gradient-to-r from-blue-50/70 via-slate-50/50 to-white border-blue-100 shadow-xs'
+                : 'bg-gradient-to-r from-emerald-500/10 via-cyan-500/5 to-transparent border-emerald-500/20'
+            }`}
+          >
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xs">
+              <div
+                className={`p-2.5 rounded-xl shadow-xs ${
+                  isLight ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'
+                }`}
+              >
                 <Package className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-display font-bold text-sm text-slate-900">
+                <h3
+                  className={`font-display font-bold text-sm ${
+                    isLight ? 'text-[#0f172a]' : 'text-white'
+                  }`}
+                >
                   Store Inventory & Product Management
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                   {mySellerProducts.length} items active · Persistent DealMate QR tags & floor-protected AI bargaining
                 </p>
               </div>
@@ -834,7 +966,11 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                   setManualAddPrefill(undefined);
                   setIsManualModalOpen(true);
                 }}
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors ${
+                  isLight
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
               >
                 <Plus className="w-4 h-4" />
                 <span>📝 Add Manually</span>
@@ -843,9 +979,13 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsScanModalOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors ${
+                  isLight
+                    ? 'bg-white hover:bg-slate-50 border border-slate-300 text-slate-800'
+                    : 'bg-surface hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)]'
+                }`}
               >
-                <Camera className="w-4 h-4 text-emerald-400" />
+                <Camera className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-emerald-400'}`} />
                 <span>📷 Scan QR / Barcode</span>
               </button>
             </div>
@@ -1270,7 +1410,9 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                   className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer border transition-all ${
                     isCameraActive
                       ? 'bg-rose-50 border-rose-200 text-rose-700'
-                      : 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800'
+                      : isLight
+                      ? 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs'
+                      : 'bg-surface text-[var(--text-primary)] border-[var(--border)] hover:bg-[var(--surface-hover)]'
                   }`}
                 >
                   {isCameraActive ? (
@@ -1280,7 +1422,7 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                     </>
                   ) : (
                     <>
-                      <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                      <Camera className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-emerald-400'}`} />
                       <span>Camera QR Scanner</span>
                     </>
                   )}
@@ -1288,8 +1430,18 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
               </div>
 
               {isCameraActive && (
-                <div className="p-4 rounded-2xl bg-slate-950 border border-emerald-500/40 text-white space-y-3">
-                  <div className="relative h-48 rounded-xl overflow-hidden bg-black flex items-center justify-center border border-slate-800">
+                <div
+                  className={`p-4 rounded-2xl border space-y-3 ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      : 'bg-surface border-[var(--border)] text-[var(--text-primary)]'
+                  }`}
+                >
+                  <div
+                    className={`relative h-48 rounded-xl overflow-hidden flex items-center justify-center border ${
+                      isLight ? 'bg-slate-200 border-slate-300' : 'bg-[var(--dm-surface-2)] border-[var(--border)]'
+                    }`}
+                  >
                     <video
                       ref={videoRef}
                       className="w-full h-full object-cover"
@@ -1338,8 +1490,14 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="w-14 h-14 rounded-xl bg-slate-900 p-2 flex flex-col items-center justify-center shrink-0">
-                          <QrCode className="w-8 h-8 text-white" />
+                        <div
+                          className={`w-14 h-14 rounded-xl p-2 flex flex-col items-center justify-center shrink-0 border ${
+                            isLight
+                              ? 'bg-blue-50 border-blue-100 text-blue-600'
+                              : 'bg-surface border-[var(--border)] text-[var(--text-primary)]'
+                          }`}
+                        >
+                          <QrCode className="w-8 h-8" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
@@ -1367,7 +1525,11 @@ export const StoreOwnerPortal: React.FC<StoreOwnerPortalProps> = ({
                           type="button"
                           onClick={() => handleScanPreseededQR(preset)}
                           disabled={isScanning}
-                          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-emerald-600 text-white text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer"
+                          className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                            isLight
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              : 'bg-surface hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)]'
+                          }`}
                         >
                           <ScanLine className="w-3.5 h-3.5" />
                           <span>{isScanning ? 'Scanning...' : 'Scan QR to Add'}</span>
@@ -2076,7 +2238,7 @@ const CategoryRangeCard: React.FC<CategoryRangeCardProps> = ({
         className={`w-full py-2 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
           isSaved
             ? 'bg-emerald-600 text-white'
-            : 'bg-slate-900 hover:bg-emerald-600 text-white'
+            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
         }`}
       >
         {isSaved ? (

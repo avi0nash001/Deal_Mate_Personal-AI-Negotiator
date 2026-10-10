@@ -19,6 +19,7 @@ import { ThemeAndBgmBar } from './components/common/ThemeAndBgmBar';
 import { AuthModal, AuthRoutePath, AuthGateContext } from './components/auth/AuthModal';
 import { StoreOwnerPortal } from './components/storeOwner/StoreOwnerPortal';
 import { ThemeId, THEMES } from './types/theme';
+import { getAuthHeaders } from './services/authHeaders';
 
 export type IntendedAction =
   | { type: 'DEMO_EARBUDS' }
@@ -504,8 +505,40 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Orders state
-  const [orders, setOrders] = useState<Order[]>([]);
+  // Orders state with persistent caching across refresh
+  const [orders, setOrders] = useState<Order[]>(() => {
+    try {
+      const saved = localStorage.getItem('dealmate_orders_cache');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Fetch verified orders from server on boot & when user signs in
+  useEffect(() => {
+    async function loadServerOrders() {
+      try {
+        const res = await fetch('/api/orders', {
+          headers: {
+            ...getAuthHeaders(),
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.orders)) {
+            setOrders(data.orders);
+            try {
+              localStorage.setItem('dealmate_orders_cache', JSON.stringify(data.orders));
+            } catch {}
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load orders from server:', e);
+      }
+    }
+    loadServerOrders();
+  }, [currentUser]);
 
   // Initial product passed into AI Negotiator ONLY when user explicitly selects a product from another tab (null by default!)
   const [negotiatorInitialProduct, setNegotiatorInitialProduct] = useState<Product | null>(null);
@@ -1142,7 +1175,13 @@ export default function App() {
   };
 
   const handleOrderConfirmed = (newOrder: Order) => {
-    setOrders((prev) => [newOrder, ...prev]);
+    setOrders((prev) => {
+      const updated = [newOrder, ...prev.filter((o) => o.id !== newOrder.id)];
+      try {
+        localStorage.setItem('dealmate_orders_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     navigateTab('orders');
   };
 
@@ -1346,6 +1385,7 @@ export default function App() {
               onSignOut={handleSignOut}
               onOpenAuthModal={() => openAuthRoute('/auth/store')}
               onNavigateToSearch={(q) => handleStartAIShoppingWithQuery(q)}
+              currentThemeId={currentThemeId}
             />
           </section>
         )}
@@ -1358,6 +1398,7 @@ export default function App() {
                 setInitialSearchQuery(`I need ${catId} within my budget`);
                 navigateTab('ai_shopping');
               }}
+              currentThemeId={currentThemeId}
             />
           </section>
         )}
@@ -1427,6 +1468,7 @@ export default function App() {
               onDeleteProduct={handleDeleteProduct}
               onUpdateUserStatus={handleUpdateUserStatus}
               onUpdateShopApproval={handleUpdateShopApproval}
+              currentThemeId={currentThemeId}
             />
           </section>
         )}

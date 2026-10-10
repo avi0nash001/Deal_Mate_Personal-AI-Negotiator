@@ -201,7 +201,7 @@ export const ProductQRModal: React.FC<ProductQRModalProps> = ({ product, onClose
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 text-slate-900 dark:text-white space-y-5">
+      <div className="relative w-full max-w-md rounded-3xl bg-surface border border-[var(--border)] shadow-2xl p-6 text-[var(--text-primary)] space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <div className="flex items-center gap-2">

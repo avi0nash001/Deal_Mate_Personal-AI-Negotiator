@@ -4,6 +4,20 @@
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Syne', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-hover: var(--surface-hover);
+  --color-dm-surface: var(--dm-surface);
+  --color-dm-surface-2: var(--dm-surface-2);
+  --color-dm-surface-3: var(--dm-surface-3);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --color-dm-border: var(--border);
+  --color-dm-border-strong: var(--border-strong);
 }
 
 html, body {
@@ -27,6 +41,9 @@ html, body {
   --success: #16A34A;
   --warning: #D97706;
 
+  --dm-surface: #FFFFFF;
+  --dm-surface-2: #F8FAFC;
+  --dm-surface-3: #F1F5F9;
   --dm-bg-1: #FFFFFF;
   --dm-bg-2: #F8FAFC;
   --dm-bg-3: #FFFFFF;
@@ -62,12 +79,12 @@ html, body {
   --supporting-text: #4B5563;
 }
 
-.theme-pure-white h1,
-.theme-pure-white h2,
-.theme-pure-white h3,
-.theme-pure-white h4,
-.theme-pure-white h5,
-.theme-pure-white h6 {
+.theme-pure-white h1:not([class*="text-white"]):not([class*="text-transparent"]),
+.theme-pure-white h2:not([class*="text-white"]):not([class*="text-transparent"]),
+.theme-pure-white h3:not([class*="text-white"]):not([class*="text-transparent"]),
+.theme-pure-white h4:not([class*="text-white"]):not([class*="text-transparent"]),
+.theme-pure-white h5:not([class*="text-white"]):not([class*="text-transparent"]),
+.theme-pure-white h6:not([class*="text-white"]):not([class*="text-transparent"]) {
   color: #111827;
 }
 
@@ -145,6 +162,9 @@ html, body {
   --surface: #181D22;
   --surface-elevated: #1E242A;
   --surface-hover: #242B32;
+  --dm-surface: #181D22;
+  --dm-surface-2: #1E242A;
+  --dm-surface-3: #242B32;
   --border: #293139;
   --border-strong: #3D4852;
   --accent: #4DA3FF;
