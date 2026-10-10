@@ -17,6 +17,7 @@ import {
   fetchRazorpayConfig,
   RazorpayConfigResponse,
 } from '../../services/razorpayService';
+import { saveOrderToFirestore } from '../../services/orderService';
 import {
   X,
   ShieldCheck,
@@ -121,6 +122,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       // Route 1: Cash On Delivery (Instant verified server confirmation)
       if (backendResponse.isCOD && backendResponse.order) {
+        setProcessingStatus('Saving order to database...');
+        try {
+          await saveOrderToFirestore(backendResponse.order);
+        } catch (e) {
+          console.warn('Firestore order save error (non-blocking):', e);
+        }
         setIsProcessing(false);
         onOrderConfirmed(backendResponse.order);
         onClose();
@@ -164,9 +171,42 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 razorpaySignature: razorpayResponse.razorpay_signature,
               });
 
-              if (verifyResult.verified && verifyResult.order) {
+              if (verifyResult.verified) {
+                const confirmedOrder: Order = {
+                  id: verifyResult.order?.id || backendResponse.orderId || `ORD-${Date.now().toString(36).toUpperCase()}`,
+                  dealToken,
+                  product,
+                  quantity,
+                  totalPaid,
+                  totalSaved,
+                  status: 'CONFIRMED',
+                  paymentMethod,
+                  paymentStatus: 'PAID',
+                  shippingAddress: {
+                    fullName,
+                    phone,
+                    address,
+                    city,
+                    postalCode,
+                  },
+                  razorpayOrderId: razorpayResponse.razorpay_order_id,
+                  razorpayPaymentId: razorpayResponse.razorpay_payment_id,
+                  razorpaySignature: razorpayResponse.razorpay_signature,
+                  currency: backendResponse.currency || 'INR',
+                  placedAt: Date.now(),
+                  estimatedDelivery: `${product.deliveryDays || 3} Business Days`,
+                  verifiedAt: new Date().toISOString(),
+                  ...(verifyResult.order || {}),
+                };
+
+                setProcessingStatus('Saving verified payment to database...');
+                try {
+                  await saveOrderToFirestore(confirmedOrder);
+                } catch (e) {
+                  console.warn('Firestore order save error (non-blocking):', e);
+                }
                 setIsProcessing(false);
-                onOrderConfirmed(verifyResult.order);
+                onOrderConfirmed(confirmedOrder);
                 onClose();
               } else {
                 throw new Error(verifyResult.error || 'Cryptographic verification failed.');
@@ -207,7 +247,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (
         msg.includes('RAZORPAY_NOT_CONFIGURED') ||
         msg.includes('credentials') ||
-        msg.includes('RAZORPAY_KEY_ID')
+        msg.includes('RAZORPAY_KEY_ID') ||
+        msg.includes('authentication failed') ||
+        msg.includes('Authentication failed') ||
+        msg.includes('RAZORPAY_AUTH_FAILED')
       ) {
         setMissingConfigHelp(true);
       }

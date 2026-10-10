@@ -12,6 +12,7 @@ export interface RazorpayConfigResponse {
   isConfigured: boolean;
   currency: string;
   mode: 'test' | 'live' | 'unconfigured';
+  secretIsAsterisks?: boolean;
 }
 
 export interface CreateOrderPayload {
@@ -117,7 +118,7 @@ export async function fetchRazorpayConfig(): Promise<RazorpayConfigResponse> {
 export async function createBackendOrder(
   payload: CreateOrderPayload
 ): Promise<CreateOrderResponse> {
-  const res = await fetch('/api/payments/create-order', {
+  const res = await fetch('/api/orders/create-razorpay-order', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -139,13 +140,23 @@ export async function createBackendOrder(
 export async function verifyBackendPayment(
   payload: VerifyPaymentPayload
 ): Promise<VerifyPaymentResponse> {
-  const res = await fetch('/api/payments/verify-payment', {
+  const body = {
+    dealmateOrderId: payload.dealmateOrderId,
+    razorpay_order_id: payload.razorpayOrderId,
+    razorpay_payment_id: payload.razorpayPaymentId,
+    razorpay_signature: payload.razorpaySignature,
+    razorpayOrderId: payload.razorpayOrderId,
+    razorpayPaymentId: payload.razorpayPaymentId,
+    razorpaySignature: payload.razorpaySignature,
+  };
+
+  const res = await fetch('/api/orders/verify-payment', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json();

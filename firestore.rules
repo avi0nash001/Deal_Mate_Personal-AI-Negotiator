@@ -358,5 +358,49 @@ service cloud.firestore {
         isValidId(settingId) &&
         (existing().sellerId == request.auth.uid || isAdmin());
     }
+
+    // Validation Blueprint: OrderRecord
+    function isValidOrderRecord(data) {
+      return data.keys().hasAll([
+        'id',
+        'productId',
+        'productName',
+        'quantity',
+        'unitPrice',
+        'totalPaid',
+        'status',
+        'paymentMethod',
+        'paymentStatus',
+        'customerName',
+        'shippingAddress',
+        'placedAt'
+      ]) &&
+      isValidId(data.id) &&
+      data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 200 &&
+      data.quantity is int && data.quantity >= 1 &&
+      data.unitPrice is number && data.unitPrice >= 0 &&
+      data.totalPaid is number && data.totalPaid >= 0 &&
+      data.status in ['CONFIRMED', 'PREPARING', 'SHIPPED', 'DELIVERED'] &&
+      data.paymentMethod in ['UPI', 'CREDIT_CARD', 'COD'] &&
+      data.paymentStatus in ['PAID', 'Paid', 'PAYMENT_PENDING', 'PAYMENT_FAILED', 'COD_PENDING', 'Pending'] &&
+      data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120 &&
+      data.shippingAddress is string && data.shippingAddress.size() >= 1 && data.shippingAddress.size() <= 500;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId);
+      allow list: if !isSignedIn() || isVerifiedUser();
+      allow create: if isValidId(orderId) &&
+        isValidOrderRecord(incoming()) &&
+        incoming().id == orderId;
+      allow update: if isValidId(orderId) && (
+        isAdmin() ||
+        !isSignedIn() ||
+        isVerifiedUser() ||
+        resource.data.sellerId == request.auth.uid ||
+        resource.data.buyerUserId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
   }
 }

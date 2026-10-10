@@ -290,6 +290,124 @@
         "maxBundleDiscountPct",
         "updatedAt"
       ]
+    },
+    "OrderRecord": {
+      "title": "OrderRecord",
+      "description": "Represents a confirmed customer purchase through Cash on Delivery or verified Razorpay payment.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique Order ID (e.g. ORD-XXXX)",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Product identifier",
+          "maxLength": 128
+        },
+        "productName": {
+          "type": "string",
+          "description": "Product name",
+          "maxLength": 200
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Quantity purchased"
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "Negotiated or list unit price in INR"
+        },
+        "totalPaid": {
+          "type": "number",
+          "description": "Total payable amount in INR"
+        },
+        "totalSaved": {
+          "type": "number",
+          "description": "Amount saved from original price in INR"
+        },
+        "status": {
+          "type": "string",
+          "description": "Order fulfillment status",
+          "enum": ["CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"]
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Payment method chosen",
+          "enum": ["UPI", "CREDIT_CARD", "COD"]
+        },
+        "paymentStatus": {
+          "type": "string",
+          "description": "Payment status",
+          "enum": ["PAID", "Paid", "PAYMENT_PENDING", "PAYMENT_FAILED", "COD_PENDING", "Pending"]
+        },
+        "razorpayOrderId": {
+          "type": "string",
+          "description": "Razorpay order ID if online payment",
+          "maxLength": 128
+        },
+        "razorpayPaymentId": {
+          "type": "string",
+          "description": "Razorpay payment ID if online payment",
+          "maxLength": 128
+        },
+        "customerName": {
+          "type": "string",
+          "description": "Full shipping name",
+          "maxLength": 120
+        },
+        "customerPhone": {
+          "type": "string",
+          "description": "Contact phone number",
+          "maxLength": 30
+        },
+        "shippingAddress": {
+          "type": "string",
+          "description": "Full shipping address",
+          "maxLength": 500
+        },
+        "buyerUserId": {
+          "type": "string",
+          "description": "UID of the buyer",
+          "maxLength": 128
+        },
+        "buyerEmail": {
+          "type": "string",
+          "description": "Email address of the buyer",
+          "maxLength": 254
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "Seller or merchant ID",
+          "maxLength": 128
+        },
+        "sellerName": {
+          "type": "string",
+          "description": "Seller or merchant name",
+          "maxLength": 120
+        },
+        "placedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of order placement"
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "productName",
+        "quantity",
+        "unitPrice",
+        "totalPaid",
+        "status",
+        "paymentMethod",
+        "paymentStatus",
+        "customerName",
+        "shippingAddress",
+        "placedAt"
+      ]
     }
   },
   "firestore": {
@@ -308,6 +426,10 @@
     "/categoryNegotiationSettings/{settingId}": {
       "schema": { "$ref": "#/entities/CategoryNegotiationSetting" },
       "description": "Stores per-category max single and bundle discount percentages per store owner."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/OrderRecord" },
+      "description": "Stores customer orders placed via Cash on Delivery or verified Razorpay payment."
     }
   }
 }

@@ -1175,6 +1175,7 @@ export default function App() {
   };
 
   const handleOrderConfirmed = (newOrder: Order) => {
+    setActiveDealToken(null);
     setOrders((prev) => {
       const updated = [newOrder, ...prev.filter((o) => o.id !== newOrder.id)];
       try {
