@@ -887,18 +887,23 @@ function clampNegotiatedPrice(
 
 /**
  * 0. Verify Store Owner Access Code at /auth/store signup
+ * Requires SELLER_ACCESS_CODE environment variable if configured.
  */
 app.post('/api/auth/verify-seller-code', (req, res) => {
   const { accessCode } = req.body;
-  const envCode = process.env.SELLER_ACCESS_CODE || 'SELLER2026';
+  const envCode = process.env.SELLER_ACCESS_CODE;
+  if (!envCode) {
+    // If no access code is configured in env, seller registration requires approval workflow
+    res.json({ valid: true, requiresApproval: true });
+    return;
+  }
   const normalized = String(accessCode || '').trim();
-  const validCodes = [envCode, 'SELLER2026', 'DEALMATE-SELLER-2026', 'STORE2026'];
-  if ( normalized && validCodes.some((c) => c.toLowerCase() === normalized.toLowerCase())) {
+  if (normalized && normalized === envCode.trim()) {
     res.json({ valid: true });
   } else {
     res.status(403).json({
       valid: false,
-      error: 'Invalid SELLER_ACCESS_CODE. Use SELLER2026 to verify Store Owner signup.',
+      error: 'Invalid seller partner code. Please verify credentials with your platform manager.',
     });
   }
 });

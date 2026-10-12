@@ -276,6 +276,19 @@
           "type": "number",
           "description": "Max bundle discount percentage (0 to 40)"
         },
+        "bulkTiers": {
+          "type": "array",
+          "description": "Optional tiered bulk volume discounts configured by merchant",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "properties": {
+              "minQty": { "type": "integer" },
+              "discountPct": { "type": "number" }
+            },
+            "required": ["minQty", "discountPct"]
+          }
+        },
         "updatedAt": {
           "type": "string",
           "format": "date-time",
@@ -392,6 +405,11 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of order placement"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of order verification by merchant or gateway"
         }
       },
       "required": [

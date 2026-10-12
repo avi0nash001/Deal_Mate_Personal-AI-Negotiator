@@ -1397,6 +1397,16 @@ export default function App() {
             <CategoriesView
               products={products}
               onSelectCategory={(catId) => {
+                const matched = products.find((p) => {
+                  const c = (p.category || '').toLowerCase();
+                  const target = catId.toLowerCase();
+                  return c === target || c.includes(target) || (target === 'grocery' && (c.includes('supermarket') || c.includes('organic')));
+                });
+                if (matched) {
+                  setAnalyzerProduct(matched);
+                  setAnalyzerNegotiatedPrice(matched.minAcceptablePrice);
+                  setAnalyzerTargetBudget(matched.listPrice);
+                }
                 setInitialSearchQuery(`I need ${catId} within my budget`);
                 navigateTab('ai_shopping');
               }}
@@ -1538,6 +1548,7 @@ export default function App() {
             : false
         }
         userBudget={session.userBudget.maxBudget || 3000}
+        currentThemeId={currentThemeId}
       />
 
       {/* User Account Modal */}

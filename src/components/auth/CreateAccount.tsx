@@ -18,8 +18,6 @@ interface CreateAccountProps {
   isStoreRegistration?: boolean;
   storeName?: string;
   onStoreNameChange?: (value: string) => void;
-  sellerAccessCode?: string;
-  onSellerAccessCodeChange?: (value: string) => void;
 }
 
 export const CreateAccount: React.FC<CreateAccountProps> = ({
@@ -37,8 +35,6 @@ export const CreateAccount: React.FC<CreateAccountProps> = ({
   isStoreRegistration = false,
   storeName = '',
   onStoreNameChange,
-  sellerAccessCode = '',
-  onSellerAccessCodeChange,
 }) => {
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-200">
@@ -80,42 +76,23 @@ export const CreateAccount: React.FC<CreateAccountProps> = ({
         </div>
 
         {/* Progressive disclosure ONLY when registering a merchant store */}
-        {isStoreRegistration && onStoreNameChange && onSellerAccessCodeChange && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div className="space-y-1">
-              <label
-                htmlFor="dealmate-store-name"
-                className="block text-xs font-semibold text-slate-700"
-              >
-                Store name
-              </label>
-              <input
-                id="dealmate-store-name"
-                type="text"
-                value={storeName}
-                onChange={(e) => onStoreNameChange(e.target.value)}
-                placeholder="Your store name"
-                disabled={loading || isSuccess}
-                className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200/90 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
-              />
-            </div>
-            <div className="space-y-1">
-              <label
-                htmlFor="dealmate-store-code"
-                className="block text-xs font-semibold text-slate-700"
-              >
-                Partner code
-              </label>
-              <input
-                id="dealmate-store-code"
-                type="text"
-                value={sellerAccessCode}
-                onChange={(e) => onSellerAccessCodeChange(e.target.value)}
-                placeholder="SELLER2026"
-                disabled={loading || isSuccess}
-                className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200/90 font-mono text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
-              />
-            </div>
+        {isStoreRegistration && onStoreNameChange && (
+          <div className="space-y-1">
+            <label
+              htmlFor="dealmate-store-name"
+              className="block text-xs font-semibold text-slate-700"
+            >
+              Store name
+            </label>
+            <input
+              id="dealmate-store-name"
+              type="text"
+              value={storeName}
+              onChange={(e) => onStoreNameChange(e.target.value)}
+              placeholder="Your store name"
+              disabled={loading || isSuccess}
+              className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200/90 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
+            />
           </div>
         )}
 

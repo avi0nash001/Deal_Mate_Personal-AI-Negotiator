@@ -314,6 +314,7 @@ service cloud.firestore {
         'category',
         'maxSingleDiscountPct',
         'maxBundleDiscountPct',
+        'bulkTiers',
         'updatedAt'
       ]) &&
       isValidId(data.id) &&
@@ -322,6 +323,10 @@ service cloud.firestore {
       data.category is string && data.category.size() >= 1 && data.category.size() <= 60 &&
       data.maxSingleDiscountPct is number && data.maxSingleDiscountPct >= 0 && data.maxSingleDiscountPct <= 40 &&
       data.maxBundleDiscountPct is number && data.maxBundleDiscountPct >= 0 && data.maxBundleDiscountPct <= 40 &&
+      (!('bulkTiers' in data) || (
+        data.bulkTiers is list &&
+        data.bulkTiers.size() <= 10
+      )) &&
       data.updatedAt is timestamp;
     }
 
@@ -349,6 +354,7 @@ service cloud.firestore {
             incoming().diff(existing()).affectedKeys().hasOnly([
               'maxSingleDiscountPct',
               'maxBundleDiscountPct',
+              'bulkTiers',
               'updatedAt'
             ])
           )
@@ -375,32 +381,88 @@ service cloud.firestore {
         'shippingAddress',
         'placedAt'
       ]) &&
+      data.keys().hasOnly([
+        'id',
+        'productId',
+        'productName',
+        'quantity',
+        'unitPrice',
+        'totalPaid',
+        'totalSaved',
+        'status',
+        'paymentMethod',
+        'paymentStatus',
+        'razorpayOrderId',
+        'razorpayPaymentId',
+        'customerName',
+        'customerPhone',
+        'shippingAddress',
+        'buyerUserId',
+        'buyerEmail',
+        'sellerId',
+        'sellerName',
+        'placedAt',
+        'verifiedAt'
+      ]) &&
       isValidId(data.id) &&
       data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 200 &&
-      data.quantity is int && data.quantity >= 1 &&
-      data.unitPrice is number && data.unitPrice >= 0 &&
-      data.totalPaid is number && data.totalPaid >= 0 &&
+      data.quantity is int && data.quantity >= 1 && data.quantity <= 10000 &&
+      data.unitPrice is number && data.unitPrice >= 0 && data.unitPrice <= 10000000 &&
+      data.totalPaid is number && data.totalPaid >= 0 && data.totalPaid <= 10000000 &&
+      (!('totalSaved' in data) || (data.totalSaved is number && data.totalSaved >= 0)) &&
       data.status in ['CONFIRMED', 'PREPARING', 'SHIPPED', 'DELIVERED'] &&
       data.paymentMethod in ['UPI', 'CREDIT_CARD', 'COD'] &&
       data.paymentStatus in ['PAID', 'Paid', 'PAYMENT_PENDING', 'PAYMENT_FAILED', 'COD_PENDING', 'Pending'] &&
+      (!('razorpayOrderId' in data) || data.razorpayOrderId == null || (data.razorpayOrderId is string && data.razorpayOrderId.size() <= 100)) &&
+      (!('razorpayPaymentId' in data) || data.razorpayPaymentId == null || (data.razorpayPaymentId is string && data.razorpayPaymentId.size() <= 100)) &&
       data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120 &&
-      data.shippingAddress is string && data.shippingAddress.size() >= 1 && data.shippingAddress.size() <= 500;
+      (!('customerPhone' in data) || data.customerPhone == null || (data.customerPhone is string && data.customerPhone.size() <= 30)) &&
+      data.shippingAddress is string && data.shippingAddress.size() >= 1 && data.shippingAddress.size() <= 500 &&
+      (!('buyerUserId' in data) || data.buyerUserId == null || (data.buyerUserId is string && data.buyerUserId.size() <= 128)) &&
+      (!('buyerEmail' in data) || data.buyerEmail == null || (data.buyerEmail is string && data.buyerEmail.size() <= 254)) &&
+      (!('sellerId' in data) || data.sellerId == null || (data.sellerId is string && data.sellerId.size() <= 128)) &&
+      (!('sellerName' in data) || data.sellerName == null || (data.sellerName is string && data.sellerName.size() <= 120)) &&
+      data.placedAt is string && data.placedAt.size() >= 10 && data.placedAt.size() <= 50 &&
+      (!('verifiedAt' in data) || data.verifiedAt == null || (data.verifiedAt is string && data.verifiedAt.size() <= 50));
     }
 
     match /orders/{orderId} {
-      allow get: if isValidId(orderId);
-      allow list: if !isSignedIn() || isVerifiedUser();
+      // Pillar 6 & 12: PII Isolation & Anti-Scraping Protection
+      // Direct get requires caller to be order's buyer, assigned seller, or platform admin (or order without buyerUserId)
+      allow get: if isValidId(orderId) && (
+        isAdmin() ||
+        (isSignedIn() && (resource.data.buyerUserId == request.auth.uid || resource.data.sellerId == request.auth.uid)) ||
+        (!('buyerUserId' in resource.data) || resource.data.buyerUserId == null)
+      );
+
+      // List queries must be filtered by buyerUserId or sellerId or requested by admin
+      allow list: if isAdmin() || (
+        isVerifiedUser() && (
+          resource.data.buyerUserId == request.auth.uid ||
+          resource.data.sellerId == request.auth.uid
+        )
+      );
+
+      // Create allowed for verified user placing an order matching their buyerUserId (or guest placing an order without spoofing another uid)
       allow create: if isValidId(orderId) &&
         isValidOrderRecord(incoming()) &&
-        incoming().id == orderId;
+        incoming().id == orderId &&
+        (
+          !isSignedIn() ? (!('buyerUserId' in incoming()) || incoming().buyerUserId == null) :
+          (!('buyerUserId' in incoming()) || incoming().buyerUserId == null || incoming().buyerUserId == request.auth.uid)
+        );
+
+      // Updates restricted to the order's seller, buyer, or admin
       allow update: if isValidId(orderId) && (
         isAdmin() ||
-        !isSignedIn() ||
-        isVerifiedUser() ||
-        resource.data.sellerId == request.auth.uid ||
-        resource.data.buyerUserId == request.auth.uid
+        (isVerifiedUser() && (
+          existing().sellerId == request.auth.uid ||
+          existing().buyerUserId == request.auth.uid
+        ))
       );
-      allow delete: if isAdmin();
+
+      // Hard deletion strictly restricted to platform admins
+      allow delete: if isValidId(orderId) && isAdmin();
     }
   }
 }

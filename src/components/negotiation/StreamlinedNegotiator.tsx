@@ -3818,6 +3818,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
             : false
         }
         userBudget={preferences?.budget}
+        currentThemeId={currentThemeId}
       />
 
       {/* Deal Analysis Inspection Modal when user clicks "Analyze Deal" */}

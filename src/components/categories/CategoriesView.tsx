@@ -104,13 +104,17 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
     const pCat = (prod.category || '').toLowerCase();
     const pSub = (prod.subcategory || '').toLowerCase();
     const t = targetCategory.toLowerCase();
+    const name = (prod.name || '').toLowerCase();
 
     if (pCat === t || pSub === t) return true;
-    if (t === 'fashion' && (pCat.includes('fashion') || pCat.includes('apparel') || pCat.includes('shirt') || pCat.includes('dress'))) return true;
-    if (t === 'footwear' && (pCat.includes('footwear') || pCat.includes('shoe') || pCat.includes('sneaker') || pCat.includes('streetwear'))) return true;
-    if (t === 'grocery' && (pCat.includes('grocery') || pCat.includes('supermarket') || pCat.includes('food') || pCat.includes('organic'))) return true;
-    if (t === 'electronics' && (pCat.includes('electronics') || pCat.includes('audio') || pCat.includes('gadget') || pCat.includes('earbud') || pCat.includes('laptop') || pCat.includes('smartwatch'))) return true;
-    if (t === 'accessories' && (pCat.includes('accessories') || pCat.includes('watch') || pCat.includes('wearable'))) return true;
+    if (t === 'fashion' && (pCat.includes('fashion') || pCat.includes('apparel') || pCat.includes('shirt') || pCat.includes('dress') || name.includes('shirt') || name.includes('dress'))) return true;
+    if (t === 'footwear' && (pCat.includes('footwear') || pCat.includes('shoe') || pCat.includes('sneaker') || pCat.includes('streetwear') || name.includes('sneaker') || name.includes('shoe'))) return true;
+    if (t === 'grocery' && (pCat.includes('grocery') || pCat.includes('supermarket') || pCat.includes('food') || pCat.includes('organic') || name.includes('organic') || name.includes('gourmet') || name.includes('basket'))) return true;
+    if (t === 'electronics' && (pCat.includes('electronics') || pCat.includes('audio') || pCat.includes('gadget') || pCat.includes('earbud') || pCat.includes('laptop') || pCat.includes('smartwatch') || pCat.includes('headphone') || pCat.includes('keyboard'))) return true;
+    if (t === 'accessories' && (pCat.includes('accessories') || pCat.includes('watch') || pCat.includes('wearable') || pSub.includes('smartwatch') || pSub.includes('watch') || name.includes('smartwatch') || name.includes('keyboard'))) return true;
+    if (t === 'beauty' && (pCat.includes('beauty') || pCat.includes('wellness') || pCat.includes('skincare') || name.includes('skincare') || name.includes('wellness'))) return true;
+    if (t === 'home' && (pCat.includes('home') || pCat.includes('kitchen') || pCat.includes('decor') || name.includes('desk') || name.includes('home'))) return true;
+    if (t === 'gifts' && (pCat.includes('gift') || pCat.includes('hamper') || name.includes('basket') || name.includes('gift') || name.includes('gourmet') || name.includes('starlight'))) return true;
     return false;
   };
 
@@ -276,6 +280,36 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
           {activeTrendingCategories.map((cat) => {
             const trendingProducts = getTrendingProductsForCategory(cat.id, 4);
             if (trendingProducts.length === 0) {
+              if (selectedCategoryTab === cat.id) {
+                return (
+                  <div
+                    key={cat.id}
+                    className={`rounded-2xl border p-8 text-center space-y-4 ${
+                      isLight ? 'bg-white border-slate-200' : 'bg-[var(--dm-surface)] border-[var(--border)]'
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center bg-blue-500/10 text-[var(--accent)]">
+                      <Sparkles className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-display font-bold text-base text-[var(--text-primary)]">
+                        No direct stock in {cat.name} right now
+                      </h3>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-md mx-auto">
+                        DealMate AI can query real-time retail partners and find competitive prices in {cat.name} within your exact budget.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onSelectCategory(cat.id)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold font-mono bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-xs"
+                    >
+                      <span>Shop {cat.name} with AI Agent</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              }
               return null;
             }
 

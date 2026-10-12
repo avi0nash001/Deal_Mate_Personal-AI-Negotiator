@@ -196,10 +196,10 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
           <ShieldCheck className="w-8 h-8" />
         </div>
         <div className="max-w-md mx-auto space-y-2">
-          <h2 className="text-xl sm:text-2xl font-display font-extrabold tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-display font-extrabold tracking-tight" style={{ color: 'var(--heading-primary)' }}>
             AI Deal Analyzer
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+          <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             Select or negotiate any product from DealMate, local partner stores, or real-time search. The AI Deal Analyzer will independently evaluate quality, seller trust, warranties, and risks before you buy.
           </p>
         </div>
@@ -276,17 +276,33 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>AI Deal Analyzer</span>
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20">
+              <span
+                className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold border"
+                style={{
+                  backgroundColor: 'var(--surface-elevated)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--supporting-text)',
+                }}
+              >
                 {detectedCategory} • {detectedSubcategory}
               </span>
-              <span className="text-[11px] font-mono text-slate-400">
+              <span
+                className="text-[11px] font-mono"
+                style={{ color: 'var(--supporting-text)' }}
+              >
                 Analysis based on current available information ({analysisReport.analyzedAt})
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-display font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h1
+              className="text-xl sm:text-2xl font-display font-black tracking-tight"
+              style={{ color: 'var(--heading-primary)' }}
+            >
               Independent Product, Seller & Risk Evaluation
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 max-w-2xl">
+            <p
+              className="text-xs sm:text-sm max-w-2xl leading-relaxed"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               "A cheaper product is not always a better deal." We check whether the negotiated deal is actually worth buying.
             </p>
           </div>
@@ -364,7 +380,7 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
           ))}
         </div>
 
-        <span className="text-[11px] font-mono text-slate-500 shrink-0">
+        <span className="text-[11px] font-mono shrink-0" style={{ color: 'var(--supporting-text)' }}>
           Showing {filteredProductList.length} products
         </span>
       </div>
@@ -464,24 +480,31 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
             />
             <div className="space-y-1.5 flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-blue-500">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                   {activeProduct.brand}
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded-md font-mono bg-slate-500/10 text-slate-400">
+                <span
+                  className="text-xs px-2 py-0.5 rounded-md font-mono border"
+                  style={{
+                    backgroundColor: 'var(--surface-elevated)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--supporting-text)',
+                  }}
+                >
                   {activeProduct.sellerName}
                 </span>
                 {activeProduct.isLocalStore && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-md font-mono bg-emerald-500/10 text-emerald-500 border border-emerald-500/25">
+                  <span className="text-[11px] px-2 py-0.5 rounded-md font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
                     📍 Verified Local Store
                   </span>
                 )}
               </div>
 
-              <h2 className="text-base sm:text-lg font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+              <h2 className="text-base sm:text-lg font-bold truncate" style={{ color: 'var(--heading-primary)' }}>
                 {activeProduct.name}
               </h2>
 
-              <p className="text-xs text-slate-500 line-clamp-2">
+              <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
                 {activeProduct.description}
               </p>
             </div>
@@ -503,22 +526,22 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
             }}
           >
             <div>
-              <div className="text-[11px] text-slate-400 font-mono">List Price</div>
-              <div className="text-xs sm:text-sm font-mono text-slate-400 line-through">
+              <div className="text-[11px] font-mono font-semibold" style={{ color: 'var(--supporting-text)' }}>List Price</div>
+              <div className="text-xs sm:text-sm font-mono line-through" style={{ color: 'var(--text-muted)' }}>
                 ₹{activeProduct.listPrice.toLocaleString('en-IN')}
               </div>
             </div>
 
             <div>
-              <div className="text-[11px] text-blue-500 font-mono font-bold">Negotiated Deal</div>
-              <div className="text-base sm:text-xl font-mono font-black text-emerald-500">
+              <div className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400">Negotiated Deal</div>
+              <div className="text-base sm:text-xl font-mono font-black text-emerald-600 dark:text-emerald-400">
                 ₹{analysisReport.negotiatedPrice.toLocaleString('en-IN')}
               </div>
             </div>
 
             <div>
-              <div className="text-[11px] text-slate-400 font-mono">Direct Savings</div>
-              <div className="text-xs sm:text-sm font-mono font-bold text-emerald-400">
+              <div className="text-[11px] font-mono font-semibold" style={{ color: 'var(--supporting-text)' }}>Direct Savings</div>
+              <div className="text-xs sm:text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400">
                 ₹{analysisReport.savings.toLocaleString('en-IN')} ({Math.round((analysisReport.savings / activeProduct.listPrice) * 100)}%)
               </div>
             </div>
@@ -535,10 +558,10 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
         >
           <div>
             <div className="flex items-center justify-between gap-2 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: 'var(--supporting-text)' }}>
                 Decision Synthesis
               </span>
-              <span className="text-[11px] font-mono text-slate-400">
+              <span className="text-[11px] font-mono" style={{ color: 'var(--supporting-text)' }}>
                 Combined Evidence Profile
               </span>
             </div>
@@ -546,14 +569,14 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
             {/* Verdict Box */}
             <div className="mt-4 flex items-center justify-between gap-4">
               <div>
-                <div className="text-xs text-slate-400 font-mono">Deal Value Score</div>
+                <div className="text-xs font-mono font-semibold" style={{ color: 'var(--supporting-text)' }}>Deal Value Score</div>
                 <div className="text-4xl sm:text-5xl font-black font-display tracking-tight flex items-baseline gap-1"
                   style={{
-                    color: dealValueScore >= 80 ? 'var(--success)' : dealValueScore >= 65 ? '#f59e0b' : '#ef4444',
+                    color: dealValueScore >= 80 ? 'var(--success)' : dealValueScore >= 65 ? '#d97706' : '#dc2626',
                   }}
                 >
                   <span>{dealValueScore}</span>
-                  <span className="text-sm font-mono text-slate-400 font-normal">/ 100</span>
+                  <span className="text-sm font-mono font-normal" style={{ color: 'var(--text-muted)' }}>/ 100</span>
                 </div>
               </div>
 
@@ -561,15 +584,15 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
               <div
                 className={`px-4 py-2.5 rounded-2xl flex items-center gap-2 border shadow-sm ${
                   verdict === 'BUY'
-                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500'
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                     : verdict === 'THINK'
-                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-500'
-                    : 'bg-red-500/10 border-red-500/40 text-red-500'
+                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400'
+                    : 'bg-red-500/10 border-red-500/40 text-red-600 dark:text-red-400'
                 }`}
               >
-                {verdict === 'BUY' && <CheckCircle2 className="w-6 h-6 text-emerald-500" />}
-                {verdict === 'THINK' && <AlertTriangle className="w-6 h-6 text-amber-500" />}
-                {verdict === 'AVOID' && <XCircle className="w-6 h-6 text-red-500" />}
+                {verdict === 'BUY' && <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />}
+                {verdict === 'THINK' && <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />}
+                {verdict === 'AVOID' && <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />}
                 <div>
                   <div className="text-[10px] font-mono uppercase font-bold tracking-wider">Final Verdict</div>
                   <div className="text-lg font-black tracking-wide">
@@ -579,7 +602,7 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
               </div>
             </div>
 
-            <p className="mt-3 text-xs leading-relaxed text-slate-400">
+            <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               {verdictSummary}
             </p>
           </div>
@@ -593,12 +616,12 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
             }}
           >
             <div>
-              <span className="text-[10px] text-slate-400 block">Product Quality</span>
-              <strong className="text-sm text-slate-200">{productQualityScore}/100</strong>
+              <span className="text-[10px] font-semibold block" style={{ color: 'var(--supporting-text)' }}>Product Quality</span>
+              <strong className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{productQualityScore}/100</strong>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block">Analysis Confidence</span>
-              <strong className="text-sm text-blue-400">{analysisConfidenceScore}/100</strong>
+              <span className="text-[10px] font-semibold block" style={{ color: 'var(--supporting-text)' }}>Analysis Confidence</span>
+              <strong className="text-sm font-bold text-blue-600 dark:text-blue-400">{analysisConfidenceScore}/100</strong>
             </div>
           </div>
         </div>
@@ -614,15 +637,15 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4" style={{ borderColor: 'var(--border)' }}>
           <div>
-            <h3 className="text-base sm:text-lg font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+            <h3 className="text-base sm:text-lg font-bold font-display" style={{ color: 'var(--heading-primary)' }}>
               Category Analysis: {categoryThresholdTitle}
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               Dynamically adapted for {detectedCategory} ({detectedSubcategory}). Zero generic filler specs.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/25">
+            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
               Score: {primaryConfidenceScore}/100
             </span>
           </div>
@@ -640,7 +663,7 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
               }}
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[11px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+                <span className="text-[11px] font-mono uppercase font-bold tracking-wider" style={{ color: 'var(--supporting-text)' }}>
                   Dimension 0{idx + 1}
                 </span>
                 <span
@@ -650,24 +673,24 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
                       metric.score >= 85
                         ? 'rgba(22, 163, 74, 0.12)'
                         : 'rgba(234, 179, 8, 0.12)',
-                    color: metric.score >= 85 ? 'var(--success)' : '#eab308',
+                    color: metric.score >= 85 ? 'var(--success)' : '#d97706',
                   }}
                 >
                   {metric.score}/100
                 </span>
               </div>
 
-              <h4 className="text-xs sm:text-sm font-bold text-slate-200 line-clamp-1">
+              <h4 className="text-xs sm:text-sm font-bold line-clamp-1" style={{ color: 'var(--text-primary)' }}>
                 {metric.name}
               </h4>
 
-              <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-3">
+              <p className="text-[11px] leading-relaxed line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
                 {metric.assessment}
               </p>
 
-              <div className="pt-2 border-t flex items-center justify-between text-[10px] font-mono text-slate-500" style={{ borderColor: 'var(--border)' }}>
+              <div className="pt-2 border-t flex items-center justify-between text-[10px] font-mono" style={{ borderColor: 'var(--border)', color: 'var(--supporting-text)' }}>
                 <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                   <span>{metric.sourceType}</span>
                 </span>
                 <span className="truncate max-w-[120px]">{metric.sourceLabel}</span>
@@ -688,12 +711,12 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-slate-400 uppercase">Seller Trust</span>
-            <span className="text-sm font-mono font-black text-emerald-500">{sellerTrustScore}/100</span>
+            <span className="text-xs font-mono font-bold uppercase" style={{ color: 'var(--supporting-text)' }}>Seller Trust</span>
+            <span className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400">{sellerTrustScore}/100</span>
           </div>
-          <div className="text-xs font-bold text-slate-200">{activeProduct.sellerName}</div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">{sellerAssessment}</p>
-          <div className="text-[10px] font-mono text-emerald-500 flex items-center gap-1 pt-1">
+          <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{activeProduct.sellerName}</div>
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{sellerAssessment}</p>
+          <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1 pt-1">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Fulfillment Verified</span>
           </div>
@@ -708,12 +731,12 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-slate-400 uppercase">Warranty</span>
-            <span className="text-sm font-mono font-black text-blue-500">{warrantyConfidenceScore}/100</span>
+            <span className="text-xs font-mono font-bold uppercase" style={{ color: 'var(--supporting-text)' }}>Warranty</span>
+            <span className="text-sm font-mono font-black text-blue-600 dark:text-blue-400">{warrantyConfidenceScore}/100</span>
           </div>
-          <div className="text-xs font-bold text-slate-200">Manufacturer & Partner Cover</div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">{warrantyTerms}</p>
-          <div className="text-[10px] font-mono text-blue-400 flex items-center gap-1 pt-1">
+          <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Manufacturer & Partner Cover</div>
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{warrantyTerms}</p>
+          <div className="text-[10px] font-mono text-blue-600 dark:text-blue-400 flex items-center gap-1 pt-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Authorized Service Network</span>
           </div>
@@ -728,12 +751,12 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-slate-400 uppercase">Return Protection</span>
-            <span className="text-sm font-mono font-black text-emerald-500">{returnProtectionScore}/100</span>
+            <span className="text-xs font-mono font-bold uppercase" style={{ color: 'var(--supporting-text)' }}>Return Protection</span>
+            <span className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400">{returnProtectionScore}/100</span>
           </div>
-          <div className="text-xs font-bold text-slate-200">Hassle-Free Policy</div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">{returnPolicyTerms}</p>
-          <div className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 pt-1">
+          <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Hassle-Free Policy</div>
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{returnPolicyTerms}</p>
+          <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1 pt-1">
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Doorstep Replacement</span>
           </div>
@@ -748,18 +771,18 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-slate-400 uppercase">Estimated Total Cost</span>
-            <span className="text-xs font-mono text-emerald-500 font-bold">
+            <span className="text-xs font-mono font-bold uppercase" style={{ color: 'var(--supporting-text)' }}>Estimated Total Cost</span>
+            <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold">
               {costBreakdown.isShippingFree ? 'Free Delivery' : `+₹${costBreakdown.shippingCharge}`}
             </span>
           </div>
-          <div className="text-lg font-mono font-black text-slate-100">
+          <div className="text-lg font-mono font-black" style={{ color: 'var(--heading-primary)' }}>
             ₹{costBreakdown.estimatedTotalPayable.toLocaleString('en-IN')}
           </div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             {costBreakdown.costBreakdownNotes[0]}
           </p>
-          <div className="text-[10px] font-mono text-slate-500 pt-1">
+          <div className="text-[10px] font-mono pt-1" style={{ color: 'var(--text-muted)' }}>
             Zero hidden charges • Guaranteed locked checkout price
           </div>
         </div>
@@ -777,15 +800,15 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
         >
           <div className="flex items-center gap-2 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
             <Sparkles className="w-4 h-4 text-emerald-500" />
-            <h3 className="font-bold text-sm sm:text-base text-slate-200">
+            <h3 className="font-bold text-sm sm:text-base" style={{ color: 'var(--heading-primary)' }}>
               Why DealMate Recommends This
             </h3>
           </div>
           <div className="space-y-3">
             {whyDealMateRecommends.map((point, pIdx) => (
-              <div key={pIdx} className="flex items-start gap-2.5 text-xs text-slate-300 leading-relaxed">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                <span>{point}</span>
+              <div key={pIdx} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span className="font-medium">{point}</span>
               </div>
             ))}
           </div>
@@ -801,15 +824,15 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
         >
           <div className="flex items-center gap-2 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
             <AlertTriangle className="w-4 h-4 text-amber-500" />
-            <h3 className="font-bold text-sm sm:text-base text-slate-200">
+            <h3 className="font-bold text-sm sm:text-base" style={{ color: 'var(--heading-primary)' }}>
               What Could Go Wrong?
             </h3>
           </div>
           <div className="space-y-3">
             {whatCouldGoWrong.map((concern, cIdx) => (
-              <div key={cIdx} className="flex items-start gap-2.5 text-xs text-slate-300 leading-relaxed">
+              <div key={cIdx} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 <span className="text-amber-500 font-bold shrink-0">⚠</span>
-                <span>{concern}</span>
+                <span className="font-medium">{concern}</span>
               </div>
             ))}
           </div>
@@ -827,14 +850,14 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-blue-500 uppercase tracking-wider">
+              <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
                 <Zap className="w-3.5 h-3.5" />
                 <span>Improve This Deal — Automatic Feedback Loop</span>
               </div>
-              <h3 className="text-base font-bold text-slate-200 mt-1">
+              <h3 className="text-base font-bold mt-1" style={{ color: 'var(--heading-primary)' }}>
                 Discovered Negotiable Opportunities
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 Send newly discovered concerns directly back to the AI Negotiator. It will retain your current price of ₹{analysisReport.negotiatedPrice.toLocaleString('en-IN')} and negotiate this specific concession.
               </p>
             </div>
@@ -851,11 +874,11 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
                 }}
               >
                 <div>
-                  <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-blue-500" />
+                  <div className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                    <Tag className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     <span>{opt.title}</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                  <p className="text-[11px] mt-1 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                     Target: {opt.expectedConcession}
                   </p>
                 </div>
@@ -884,8 +907,8 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
       >
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="text-left">
-            <div className="text-[11px] text-slate-400 font-mono">Final Recommended Action</div>
-            <div className="text-sm font-bold text-slate-200">
+            <div className="text-[11px] font-mono font-semibold" style={{ color: 'var(--supporting-text)' }}>Final Recommended Action</div>
+            <div className="text-sm font-bold" style={{ color: 'var(--heading-primary)' }}>
               {verdict === 'BUY'
                 ? 'Proceed with High Confidence'
                 : verdict === 'THINK'
@@ -964,13 +987,18 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowSourcesModal(false)}
-                className="text-xs px-2.5 py-1 rounded-lg border text-slate-400 hover:text-white"
+                className="text-xs px-2.5 py-1 rounded-lg border cursor-pointer"
+                style={{
+                  color: 'var(--supporting-text)',
+                  borderColor: 'var(--border)',
+                  backgroundColor: 'var(--surface-elevated)',
+                }}
               >
                 Close
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               Every data point in DealMate is tagged by source reliability. Inferred conclusions are never presented as verified facts.
             </p>
 
@@ -985,7 +1013,7 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-200">{src.section}</span>
+                    <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{src.section}</span>
                     <span
                       className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold"
                       style={{
@@ -993,14 +1021,14 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
                           src.tier === 'VERIFIED'
                             ? 'rgba(22, 163, 74, 0.15)'
                             : 'rgba(234, 179, 8, 0.15)',
-                        color: src.tier === 'VERIFIED' ? 'var(--success)' : '#eab308',
+                        color: src.tier === 'VERIFIED' ? 'var(--success)' : '#d97706',
                       }}
                     >
                       {src.tier}
                     </span>
                   </div>
-                  <div className="text-slate-400">{src.source}</div>
-                  {src.notes && <div className="text-[11px] text-slate-500">{src.notes}</div>}
+                  <div style={{ color: 'var(--text-secondary)' }}>{src.source}</div>
+                  {src.notes && <div className="text-[11px]" style={{ color: 'var(--supporting-text)' }}>{src.notes}</div>}
                 </div>
               ))}
             </div>
@@ -1032,18 +1060,23 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
             <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-blue-500" />
-                <h3 className="text-base font-bold">Trusted Opinion Layer</h3>
+                <h3 className="text-base font-bold" style={{ color: 'var(--heading-primary)' }}>Trusted Opinion Layer</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowTrustedOpinionsModal(false)}
-                className="text-xs px-2.5 py-1 rounded-lg border text-slate-400 hover:text-white"
+                className="text-xs px-2.5 py-1 rounded-lg border cursor-pointer"
+                style={{
+                  color: 'var(--supporting-text)',
+                  borderColor: 'var(--border)',
+                  backgroundColor: 'var(--surface-elevated)',
+                }}
               >
                 Close
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               Family, friends, and verified buyers provide contextual experience. Note that community opinions do not override verified lab or warranty evidence.
             </p>
 
@@ -1058,18 +1091,18 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-200">{op.userName} ({op.relation})</span>
-                    <span className="text-emerald-400 font-mono font-bold">{op.ratingScore}/100</span>
+                    <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{op.userName} ({op.relation})</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{op.ratingScore}/100</span>
                   </div>
-                  <p className="text-slate-300 leading-relaxed">{op.comment}</p>
-                  <div className="text-[10px] text-slate-500 font-mono">{op.timestamp}</div>
+                  <p className="leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{op.comment}</p>
+                  <div className="text-[10px] font-mono" style={{ color: 'var(--supporting-text)' }}>{op.timestamp}</div>
                 </div>
               ))}
             </div>
 
             {/* Add Opinion Form */}
             <form onSubmit={handleAddTrustedOpinion} className="pt-2 border-t space-y-3" style={{ borderColor: 'var(--border)' }}>
-              <div className="text-xs font-bold text-slate-200">Add Your or Friend's Perspective</div>
+              <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Add Your or Friend's Perspective</div>
               <input
                 type="text"
                 value={newOpinionComment}
@@ -1084,7 +1117,7 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
               />
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400">Score:</span>
+                  <span style={{ color: 'var(--supporting-text)' }}>Score:</span>
                   <input
                     type="number"
                     min="50"
@@ -1095,13 +1128,14 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
                     style={{
                       backgroundColor: 'var(--surface-elevated)',
                       borderColor: 'var(--border)',
+                      color: 'var(--text-primary)',
                     }}
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={!newOpinionComment.trim()}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs cursor-pointer shadow-xs"
                 >
                   Add Opinion
                 </button>
