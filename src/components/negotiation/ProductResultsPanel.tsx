@@ -1249,17 +1249,42 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
         >
           <div className="flex items-center gap-1.5 flex-wrap">
             {isExternal ? (
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border"
-                style={{
-                  backgroundColor: 'var(--surface-elevated)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                <ExternalLink className="w-3 h-3" />
-                <span>{cand.retailerName}</span>
-              </span>
+              <>
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border"
+                  style={{
+                    backgroundColor: 'var(--surface-elevated)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>{cand.retailerName}</span>
+                </span>
+                {cand.isFallbackData || p.isFallbackData ? (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                    title="Product data served from DealMate Fallback Catalog Feed"
+                  >
+                    Fallback Feed
+                  </span>
+                ) : cand.isCached || p.isCached ? (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30"
+                    title="Live Google Shopping data cached for fast response"
+                  >
+                    SerpAPI (Cached)
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                    title="Real-time Google Shopping result retrieved live via SerpAPI"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live SerpAPI
+                  </span>
+                )}
+              </>
             ) : (
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border"
@@ -1582,6 +1607,16 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
             >
               {totalCount} {totalCount === 1 ? 'match' : 'matches'}
             </span>
+            {visibleCandidates.some((c) => c.isSerpApiLive) ? (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live SerpAPI
+              </span>
+            ) : visibleCandidates.some((c) => c.isFallbackData) ? (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                Fallback Catalog
+              </span>
+            ) : null}
           </div>
 
           {/* Side-by-side Compare Launcher if items selected */}

@@ -46,7 +46,7 @@ async function syncOrderStatusToFirestore(orderId: string, status: string, payme
 }
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
 app.use(
   express.json({
@@ -2183,21 +2183,46 @@ function normalizeMarketplaceSource(rawSource?: string): string {
 async function querySerpApiGoogleShopping(
   query: string,
   targetBudget: number = 3000,
-  category: string = 'Electronics'
-): Promise<{ products: any[]; sources: any[]; rawItemsCount: number } | null> {
+  category: string = 'Electronics',
+  forceFresh: boolean = false
+): Promise<{
+  products: any[];
+  sources: any[];
+  rawItemsCount: number;
+  status: number;
+  elapsedMs: number;
+  isCached: boolean;
+  errorCategory: string;
+} | null> {
+  const startTime = Date.now();
+
   if (!SERPAPI_KEY) {
-    return null;
+    console.warn('[SerpAPI Shopping] Runtime secret SERPAPI_KEY is not configured. Error category: MISSING_SECRET');
+    return {
+      products: [],
+      sources: [],
+      rawItemsCount: 0,
+      status: 0,
+      elapsedMs: 0,
+      isCached: false,
+      errorCategory: 'MISSING_SECRET',
+    };
   }
 
   const cacheKey = `serp_shopping_${query.trim().toLowerCase()}_${targetBudget}`;
   const cached = serpapiProductCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.payload;
+  if (!forceFresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    const elapsed = Date.now() - startTime;
+    return {
+      ...cached.payload,
+      isCached: true,
+      elapsedMs: elapsed,
+    };
   }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8500);
+    const timeoutId = setTimeout(() => controller.abort(), 9500);
 
     const serpUrl = new URL('https://serpapi.com/search.json');
     serpUrl.searchParams.set('engine', 'google_shopping');
@@ -2211,10 +2236,27 @@ async function querySerpApiGoogleShopping(
       headers: { Accept: 'application/json' },
     });
     clearTimeout(timeoutId);
+    const elapsed = Date.now() - startTime;
 
     if (!res.ok) {
-      console.warn(`SerpAPI request returned HTTP ${res.status}: ${res.statusText}`);
-      return null;
+      let errCategory = `HTTP_ERROR_${res.status}`;
+      if (res.status === 401 || res.status === 403) {
+        errCategory = 'INVALID_KEY_OR_UNAUTHORIZED';
+      } else if (res.status === 429) {
+        errCategory = 'RATE_LIMIT_OR_QUOTA_EXCEEDED';
+      } else if (res.status >= 500) {
+        errCategory = 'SERPAPI_SERVER_ERROR';
+      }
+      console.warn(`[SerpAPI Shopping] HTTP ${res.status} (${res.statusText}) in ${elapsed}ms. Category: ${errCategory}`);
+      return {
+        products: [],
+        sources: [],
+        rawItemsCount: 0,
+        status: res.status,
+        elapsedMs: elapsed,
+        isCached: false,
+        errorCategory: errCategory,
+      };
     }
 
     const data: any = await res.json();
@@ -2223,7 +2265,16 @@ async function querySerpApiGoogleShopping(
       : [];
 
     if (rawResults.length === 0) {
-      return null;
+      console.info(`[SerpAPI Shopping] HTTP 200 in ${elapsed}ms, 0 shopping results found. Category: EMPTY_RESULTS`);
+      return {
+        products: [],
+        sources: [],
+        rawItemsCount: 0,
+        status: 200,
+        elapsedMs: elapsed,
+        isCached: false,
+        errorCategory: 'EMPTY_RESULTS',
+      };
     }
 
     const fetchedAt = new Date().toISOString();
@@ -2275,6 +2326,9 @@ async function querySerpApiGoogleShopping(
         isLocalStore: false,
         isStoreOwnerListed: false,
         isLiveGoogleSearch: true,
+        isFallbackData: false,
+        isSerpApiLive: true,
+        dataSource: 'serpapi_live',
         marketplaceSource: marketplace,
         externalUrl: directUrl,
         searchSourceTitle: `${marketplace} (via SerpAPI Google Shopping)`,
@@ -2300,13 +2354,29 @@ async function querySerpApiGoogleShopping(
       products: normalizedProducts,
       sources: Array.from(sourcesMap.values()),
       rawItemsCount: rawResults.length,
+      status: 200,
+      elapsedMs: elapsed,
+      isCached: false,
+      errorCategory: 'NONE',
     };
 
+    console.info(`[SerpAPI Shopping] HTTP 200 OK in ${elapsed}ms, raw count: ${rawResults.length}, normalized: ${normalizedProducts.length}. Status: SUCCESS`);
     serpapiProductCache.set(cacheKey, { timestamp: Date.now(), payload: result });
     return result;
   } catch (err: any) {
-    console.warn('SerpAPI Google Shopping query failed:', err?.message || err);
-    return null;
+    const elapsed = Date.now() - startTime;
+    const isTimeout = err?.name === 'AbortError';
+    const errCategory = isTimeout ? 'NETWORK_TIMEOUT_ERROR' : 'NETWORK_ERROR';
+    console.warn(`[SerpAPI Shopping] Query failed in ${elapsed}ms: ${err?.message || err}. Category: ${errCategory}`);
+    return {
+      products: [],
+      sources: [],
+      rawItemsCount: 0,
+      status: 0,
+      elapsedMs: elapsed,
+      isCached: false,
+      errorCategory: errCategory,
+    };
   }
 }
 
@@ -2314,21 +2384,44 @@ async function querySerpApiGoogleShopping(
  * Queries SerpAPI google organic engine for general product research and multi-seller comparison
  */
 async function querySerpApiGoogleOrganic(
-  query: string
-): Promise<{ sellers: any[]; sources: any[] } | null> {
+  query: string,
+  forceFresh: boolean = false
+): Promise<{
+  sellers: any[];
+  sources: any[];
+  status: number;
+  elapsedMs: number;
+  isCached: boolean;
+  errorCategory: string;
+} | null> {
+  const startTime = Date.now();
+
   if (!SERPAPI_KEY) {
-    return null;
+    console.warn('[SerpAPI Organic] Runtime secret SERPAPI_KEY is not configured. Category: MISSING_SECRET');
+    return {
+      sellers: [],
+      sources: [],
+      status: 0,
+      elapsedMs: 0,
+      isCached: false,
+      errorCategory: 'MISSING_SECRET',
+    };
   }
 
   const cacheKey = `serp_organic_${query.trim().toLowerCase()}`;
   const cached = serpapiProductCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.payload;
+  if (!forceFresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    const elapsed = Date.now() - startTime;
+    return {
+      ...cached.payload,
+      isCached: true,
+      elapsedMs: elapsed,
+    };
   }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8500);
+    const timeoutId = setTimeout(() => controller.abort(), 9500);
 
     const serpUrl = new URL('https://serpapi.com/search.json');
     serpUrl.searchParams.set('engine', 'google');
@@ -2342,9 +2435,23 @@ async function querySerpApiGoogleOrganic(
       headers: { Accept: 'application/json' },
     });
     clearTimeout(timeoutId);
+    const elapsed = Date.now() - startTime;
 
     if (!res.ok) {
-      return null;
+      let errCategory = `HTTP_ERROR_${res.status}`;
+      if (res.status === 401 || res.status === 403) errCategory = 'INVALID_KEY_OR_UNAUTHORIZED';
+      else if (res.status === 429) errCategory = 'RATE_LIMIT_OR_QUOTA_EXCEEDED';
+      else if (res.status >= 500) errCategory = 'SERPAPI_SERVER_ERROR';
+
+      console.warn(`[SerpAPI Organic] HTTP ${res.status} (${res.statusText}) in ${elapsed}ms. Category: ${errCategory}`);
+      return {
+        sellers: [],
+        sources: [],
+        status: res.status,
+        elapsedMs: elapsed,
+        isCached: false,
+        errorCategory: errCategory,
+      };
     }
 
     const data: any = await res.json();
@@ -2383,14 +2490,130 @@ async function querySerpApiGoogleOrganic(
       }
     }
 
-    const result = { sellers, sources };
+    const result = {
+      sellers,
+      sources,
+      status: 200,
+      elapsedMs: elapsed,
+      isCached: false,
+      errorCategory: 'NONE',
+    };
+
+    console.info(`[SerpAPI Organic] HTTP 200 OK in ${elapsed}ms, sellers: ${sellers.length}, sources: ${sources.length}. Status: SUCCESS`);
     serpapiProductCache.set(cacheKey, { timestamp: Date.now(), payload: result });
     return result;
   } catch (err: any) {
-    console.warn('SerpAPI Google Organic query failed:', err?.message || err);
-    return null;
+    const elapsed = Date.now() - startTime;
+    const isTimeout = err?.name === 'AbortError';
+    const errCategory = isTimeout ? 'NETWORK_TIMEOUT_ERROR' : 'NETWORK_ERROR';
+    console.warn(`[SerpAPI Organic] Query failed in ${elapsed}ms: ${err?.message || err}. Category: ${errCategory}`);
+    return {
+      sellers: [],
+      sources: [],
+      status: 0,
+      elapsedMs: elapsed,
+      isCached: false,
+      errorCategory: errCategory,
+    };
   }
 }
+
+/**
+ * Diagnostic and health endpoints for SerpAPI
+ */
+app.get('/api/serpapi/health', (_req, res) => {
+  const hasKey = Boolean(SERPAPI_KEY);
+  res.json({
+    status: hasKey ? 'configured' : 'missing_secret',
+    hasKey,
+    keyConfigured: hasKey,
+    keyLength: SERPAPI_KEY ? SERPAPI_KEY.length : 0,
+    enginesAvailable: ['google_shopping', 'google_organic'],
+    cacheEntries: {
+      shopping: serpapiProductCache.size,
+      sellerComparison: sellerComparisonCache.size,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.post('/api/serpapi/diagnostic', async (req, res) => {
+  const { query = 'Sony WH-1000XM5 wireless headphones', engine = 'google_shopping', forceFresh = true, budget = 20000 } = req.body || {};
+  const trimmedQuery = String(query).trim();
+  const startTime = Date.now();
+
+  if (!SERPAPI_KEY) {
+    res.status(400).json({
+      success: false,
+      errorCategory: 'MISSING_SECRET',
+      message: 'Runtime secret SERPAPI_KEY is missing or empty. Please configure SERPAPI_KEY in the environment secrets.',
+      elapsedMs: 0,
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+
+  try {
+    if (engine === 'google_shopping') {
+      const result = await querySerpApiGoogleShopping(trimmedQuery, Number(budget) || 20000, 'Electronics', forceFresh);
+      const elapsed = Date.now() - startTime;
+      if (result && result.products.length > 0) {
+        res.json({
+          success: true,
+          engine: 'google_shopping',
+          query: trimmedQuery,
+          status: result.status,
+          elapsedMs: result.elapsedMs || elapsed,
+          rawItemsCount: result.rawItemsCount,
+          normalizedProductsCount: result.products.length,
+          isCached: Boolean(result.isCached),
+          sampleResults: result.products.slice(0, 3).map((p: any) => ({
+            name: p.name,
+            listPrice: p.listPrice,
+            marketplaceSource: p.marketplaceSource,
+            sellerName: p.sellerName,
+            rating: p.rating,
+            hasImage: Boolean(p.image),
+            hasDirectLink: Boolean(p.externalUrl),
+          })),
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        res.status(200).json({
+          success: false,
+          engine: 'google_shopping',
+          query: trimmedQuery,
+          errorCategory: result?.errorCategory || 'EMPTY_RESULTS',
+          status: result?.status || 200,
+          elapsedMs: elapsed,
+          message: 'SerpAPI request returned 0 shopping results or failed.',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } else {
+      const result = await querySerpApiGoogleOrganic(trimmedQuery, forceFresh);
+      const elapsed = Date.now() - startTime;
+      res.json({
+        success: Boolean(result && (result.sellers.length > 0 || result.sources.length > 0)),
+        engine: 'google',
+        query: trimmedQuery,
+        status: result?.status || 200,
+        elapsedMs: result?.elapsedMs || elapsed,
+        sellersCount: result?.sellers.length || 0,
+        sourcesCount: result?.sources.length || 0,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      errorCategory: 'UNEXPECTED_ERROR',
+      message: err?.message || 'Diagnostic request failed',
+      elapsedMs: Date.now() - startTime,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 
 async function generateWithFallbackModel(
@@ -3060,6 +3283,7 @@ app.post('/api/external-products/fallback-search', async (req, res) => {
     budget = 2500,
     preferredBrands = [],
     requiredFeatures = [],
+    forceFresh = false,
   } = req.body || {};
   const targetBudget = Math.max(300, Number(budget) || 2500);
   const rawQuery = String(query || productType || 'wireless earbuds').trim();
@@ -3077,7 +3301,8 @@ app.post('/api/external-products/fallback-search', async (req, res) => {
   let serpResults = await querySerpApiGoogleShopping(
     `${brandHint} ${rawQuery}`.trim() || rawQuery,
     targetBudget,
-    category
+    category,
+    Boolean(forceFresh)
   );
 
   if (serpResults && serpResults.products.length > 0) {
@@ -3092,7 +3317,13 @@ app.post('/api/external-products/fallback-search', async (req, res) => {
       products: serpResults.products,
       sources: serpResults.sources,
       fetchedAt,
-      isSerpApiLive: true,
+      isSerpApiLive: !serpResults.isCached,
+      isCached: Boolean(serpResults.isCached),
+      isFallbackData: false,
+      dataSource: serpResults.isCached ? 'serpapi_cached' : 'serpapi_live',
+      status: serpResults.status,
+      elapsedMs: serpResults.elapsedMs,
+      rawItemsCount: serpResults.rawItemsCount,
     });
     return;
   }
@@ -3419,10 +3650,14 @@ app.post('/api/external-products/fallback-search', async (req, res) => {
       sellerRating: 4.7,
       isLocalStore: false,
       isStoreOwnerListed: false,
-      isLiveGoogleSearch: true,
+      isLiveGoogleSearch: false,
+      isFallbackData: true,
+      isSerpApiLive: false,
+      isCached: false,
+      dataSource: 'fallback_feed',
       marketplaceSource: item.marketplaceSource,
       externalUrl,
-      searchSourceTitle: `${item.marketplaceSource} External Product Feed`,
+      searchSourceTitle: `${item.marketplaceSource} Fallback Catalog Feed`,
       fetchedAt,
       image: item.image,
       description: item.description,
@@ -3431,15 +3666,20 @@ app.post('/api/external-products/fallback-search', async (req, res) => {
       bundleEligible: false,
       deliveryDays: 2,
       aiMatchScore: 93 - idx * 3,
-      whyRecommended: `Discovered via DealHunter External Product Feed on ${item.marketplaceSource}. Marked as Retailer listing with direct "View Product" redirect.`,
+      whyRecommended: `Discovered via DealHunter Fallback Catalog Feed on ${item.marketplaceSource}. Marked as Retailer fallback listing with direct "View Product" redirect.`,
     };
   });
 
   res.json({
     fallbackSearchTriggered: true,
-    feedSourcesQueried: ['Amazon.in Product Feed', 'Flipkart Catalog API', 'Croma Retail Feed', 'Myntra Partner Feed'],
+    feedSourcesQueried: ['Amazon.in Fallback Catalog', 'Flipkart Catalog Fallback', 'Croma Fallback Catalog', 'Myntra Partner Fallback'],
     products: externalProducts,
     fetchedAt,
+    isSerpApiLive: false,
+    isCached: false,
+    isFallbackData: true,
+    dataSource: 'fallback_feed',
+    fallbackReason: serpResults?.errorCategory || (!SERPAPI_KEY ? 'MISSING_SECRET' : 'EMPTY_OR_UNAVAILABLE_API_RESULTS'),
   });
 });
 

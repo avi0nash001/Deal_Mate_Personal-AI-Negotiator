@@ -1148,9 +1148,9 @@ export default function App() {
     setIsAutoPlaying(false);
   };
 
-  const handleToggleMultiSeller = () => {
+  const handleToggleMultiSeller = async () => {
     if (!showMultiSeller) {
-      const comp = NegotiationEngine.runMultiSellerComparison(
+      const comp = await NegotiationEngine.fetchLiveMultiSellerComparison(
         session.product,
         session.userBudget.target,
         categorySettings
@@ -1395,9 +1395,14 @@ export default function App() {
         {currentTab === 'categories' && (
           <section className="container w-full max-w-full sm:max-w-3xl md:max-w-5xl lg:max-w-6xl mx-auto">
             <CategoriesView
+              products={products}
               onSelectCategory={(catId) => {
                 setInitialSearchQuery(`I need ${catId} within my budget`);
                 navigateTab('ai_shopping');
+              }}
+              onSelectProduct={(prod) => {
+                setNegotiatorInitialProduct(prod);
+                navigateTab('negotiator');
               }}
               currentThemeId={currentThemeId}
             />
@@ -1433,6 +1438,9 @@ export default function App() {
               onOpenCompareModal={() => setIsCompareOpen(true)}
               onNavigateToStores={() => navigateTab('stores')}
               currentThemeId={currentThemeId}
+              competingSellers={competingSellers}
+              showMultiSeller={showMultiSeller}
+              onToggleMultiSeller={handleToggleMultiSeller}
             />
           </section>
         )}
@@ -1450,6 +1458,7 @@ export default function App() {
             <OrdersView
               orders={orders}
               onStartNewNegotiation={() => navigateTab('ai_shopping')}
+              currentThemeId={currentThemeId}
             />
           </section>
         )}

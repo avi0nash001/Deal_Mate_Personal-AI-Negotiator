@@ -61,6 +61,9 @@ export interface Product {
   externalId?: string;
   isStoreOwnerListed?: boolean;
   isLiveGoogleSearch?: boolean;
+  isFallbackData?: boolean;
+  isCached?: boolean;
+  dataSource?: string;
   searchSourceTitle?: string;
   fetchedAt?: string;
   priceHistory?: Array<{ date: string; price: number }>;

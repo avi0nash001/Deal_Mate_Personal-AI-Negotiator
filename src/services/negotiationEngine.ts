@@ -380,6 +380,49 @@ export class NegotiationEngine {
   }
 
   /**
+   * Run live multi-seller comparison enriched with SerpAPI Google Shopping & Google Organic data
+   */
+  static async fetchLiveMultiSellerComparison(
+    product: Product,
+    targetPrice: number,
+    categorySettings: CategoryNegotiationSetting[] = []
+  ): Promise<Array<{
+    sellerId: string;
+    sellerName: string;
+    offeredPrice: number;
+    deliveryDays: number;
+    stock: number;
+    isBest?: boolean;
+    sourceUrl?: string;
+    isSerpApiEnriched?: boolean;
+  }>> {
+    try {
+      const res = await fetch('/api/gemini/live-seller-comparison', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName: product.name,
+          brand: product.brand,
+          category: product.category,
+          listPrice: product.listPrice,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.sellers) && data.sellers.length > 0) {
+          return data.sellers.map((s: any) => ({
+            ...s,
+            isSerpApiEnriched: Boolean(data.isSerpApiEnriched),
+          }));
+        }
+      }
+    } catch {
+      // Fallback to local simulation
+    }
+    return this.runMultiSellerComparison(product, targetPrice, categorySettings);
+  }
+
+  /**
    * Generate secure Deal Token for checkout
    */
   static generateDealToken(session: NegotiationSession): DealToken {
@@ -611,3 +654,30 @@ export class NegotiationEngine {
     };
   }
 }
+
+/**
+ * Ranks products based on existing 'rating' and 'reviewsCount' fields.
+ * Uses a Bayesian-weighted trending score:
+ * score = rating * log10(reviewsCount + 10)
+ * Secondary tie-breaker by review count, then list price.
+ */
+export function rankProductsByRatingAndReviews(products: Product[]): Product[] {
+  return [...products].sort((a, b) => {
+    const ratingA = typeof a.rating === 'number' && !Number.isNaN(a.rating) ? a.rating : 0;
+    const ratingB = typeof b.rating === 'number' && !Number.isNaN(b.rating) ? b.rating : 0;
+    const reviewsA = typeof a.reviewsCount === 'number' && !Number.isNaN(a.reviewsCount) ? a.reviewsCount : 0;
+    const reviewsB = typeof b.reviewsCount === 'number' && !Number.isNaN(b.reviewsCount) ? b.reviewsCount : 0;
+
+    const scoreA = ratingA * Math.log10(reviewsA + 10);
+    const scoreB = ratingB * Math.log10(reviewsB + 10);
+
+    if (Math.abs(scoreB - scoreA) > 0.0001) {
+      return scoreB - scoreA;
+    }
+    if (ratingB !== ratingA) {
+      return ratingB - ratingA;
+    }
+    return reviewsB - reviewsA;
+  });
+}
+

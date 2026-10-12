@@ -110,6 +110,9 @@ export interface DealHunterProductCandidate {
   retailerUrl: string;
   isLowestPriceAcrossSources?: boolean;
   isSimulatedDemo: boolean;
+  isSerpApiLive?: boolean;
+  isFallbackData?: boolean;
+  isCached?: boolean;
   matchingFeatures: string[];
   missingOrAlternativeFeatures?: string[];
   dealPotential: string;
@@ -1016,6 +1019,9 @@ export class DealHunterAgent {
       if (response.ok) {
         const data = await response.json();
         const rawProducts: Product[] = Array.isArray(data.products) ? data.products : [];
+        const isLive = Boolean(data.isSerpApiLive);
+        const isCached = Boolean(data.isCached);
+        const isFallback = Boolean(data.isFallbackData) || (!isLive && !isCached);
         const normalizedExternal: Product[] = rawProducts.map((item, idx) => ({
           ...item,
           id: item.id || `ext_api_${Date.now()}_${idx}`,
@@ -1024,7 +1030,10 @@ export class DealHunterAgent {
           bundleEligible: false,
           isLocalStore: false,
           isStoreOwnerListed: false,
-          isLiveGoogleSearch: true,
+          isLiveGoogleSearch: isLive || Boolean(item.isLiveGoogleSearch),
+          isFallbackData: isFallback || Boolean(item.isFallbackData),
+          isCached: isCached || Boolean(item.isCached),
+          dataSource: item.dataSource || (isLive ? (isCached ? 'serpapi_cached' : 'serpapi_live') : 'fallback_feed'),
           marketplaceSource: item.marketplaceSource || 'Amazon.in',
           externalUrl: buildCanonicalRetailerUrl(item),
         }));
@@ -1033,7 +1042,9 @@ export class DealHunterAgent {
           products: normalizedExternal,
           feedSourcesQueried: Array.isArray(data.feedSourcesQueried)
             ? data.feedSourcesQueried
-            : ['Amazon.in Product Feed', 'Flipkart Catalog API', 'Croma Retail Feed'],
+            : isLive
+            ? ['SerpAPI Google Shopping Engine (gl=in)', 'Amazon.in Verified Store', 'Flipkart Verified Store']
+            : ['Amazon.in Fallback Catalog', 'Flipkart Catalog Fallback', 'Croma Fallback Catalog'],
         };
       }
     } catch {
@@ -1044,7 +1055,7 @@ export class DealHunterAgent {
     const fallbackItem: Product = {
       id: `ext_local_feed_${Date.now()}_0`,
       externalId: `ext_local_feed_${Date.now()}_0`,
-      name: `${brand} ${prefs.productType} (Verified Retailer Feed)`,
+      name: `${brand} ${prefs.productType} (Fallback Retailer Feed)`,
       brand,
       category: prefs.category,
       purpose: ['Everyday', 'College'],
@@ -1060,14 +1071,17 @@ export class DealHunterAgent {
       sellerRating: 4.7,
       isLocalStore: false,
       isStoreOwnerListed: false,
-      isLiveGoogleSearch: true,
+      isLiveGoogleSearch: false,
+      isFallbackData: true,
+      isCached: false,
+      dataSource: 'fallback_feed',
       marketplaceSource: 'Amazon.in',
       externalUrl: `https://www.amazon.in/s?k=${encodeURIComponent(`${brand} ${prefs.productType}`)}`,
       image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800&q=80',
-      description: `External Retailer feed listing for ${brand} ${prefs.productType}. Click "View Product" to open on the retailer's site.`,
+      description: `Fallback Retailer feed listing for ${brand} ${prefs.productType}. Marked as fallback data.`,
       specs: {
-        Source: 'Amazon.in External Feed',
-        ListingType: 'Retailer (Fixed Price)',
+        Source: 'Amazon.in Fallback Catalog Feed',
+        ListingType: 'Retailer (Fallback Catalog)',
       },
       isNegotiable: false,
       bundleEligible: false,
@@ -1323,7 +1337,10 @@ export class DealHunterAgent {
         matchScorePct,
         resultBadges,
         retailerUrl: buildCanonicalRetailerUrl(product),
-        isSimulatedDemo: !product.isLiveGoogleSearch,
+        isSimulatedDemo: Boolean(product.isFallbackData || !product.isLiveGoogleSearch),
+        isSerpApiLive: Boolean(product.isLiveGoogleSearch && !product.isFallbackData),
+        isFallbackData: Boolean(product.isFallbackData),
+        isCached: Boolean(product.isCached),
         matchingFeatures: matchingFeatures.slice(0, 4),
         dealPotential,
         eligibleForNegotiation,

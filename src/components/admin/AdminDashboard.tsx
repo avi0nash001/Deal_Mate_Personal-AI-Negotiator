@@ -310,19 +310,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div
           className={`p-4 rounded-2xl border transition-all ${
             isLight
-              ? 'bg-white border-slate-200 shadow-xs'
-              : 'bg-[#0B101D] border border-slate-800'
+              ? 'bg-white border-slate-200 shadow-xs text-slate-900'
+              : 'bg-[#0B101D] border-slate-800 text-white'
           }`}
         >
-          <div className="text-[11px] font-mono uppercase text-slate-500">Platform Users</div>
           <div
-            className={`text-xl sm:text-2xl font-mono font-extrabold mt-1 ${
-              isLight ? 'text-[#0f172a]' : 'text-white'
+            className={`text-[11px] font-mono uppercase tracking-wider font-semibold ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
+            Platform Users
+          </div>
+          <div
+            className={`text-xl sm:text-2xl font-mono font-extrabold tabular-nums mt-1 ${
+              isLight ? 'text-[#0F172A]' : 'text-[#F8FAFC]'
             }`}
           >
             {registeredUsers.length}
           </div>
-          <div className={`text-[11px] mt-0.5 ${isLight ? 'text-blue-600 font-semibold' : 'text-cyan-400'}`}>
+          <div
+            className={`text-[11px] mt-0.5 ${
+              isLight ? 'text-blue-700 font-semibold' : 'text-cyan-300 font-medium'
+            }`}
+          >
             {buyers.length} Buyers • {storeOwners.length} Shop Owners
           </div>
         </div>
@@ -330,15 +340,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div
           className={`p-4 rounded-2xl border transition-all ${
             isLight
-              ? 'bg-white border-slate-200 shadow-xs'
-              : 'bg-[#0B101D] border border-slate-800'
+              ? 'bg-white border-slate-200 shadow-xs text-slate-900'
+              : 'bg-[#0B101D] border-slate-800 text-white'
           }`}
         >
-          <div className="text-[11px] font-mono uppercase text-slate-500">Total Deal Savings</div>
-          <div className="text-xl sm:text-2xl font-mono font-extrabold text-emerald-600 mt-1">
+          <div
+            className={`text-[11px] font-mono uppercase tracking-wider font-semibold ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
+            Total Deal Savings
+          </div>
+          <div
+            className={`text-xl sm:text-2xl font-mono font-extrabold tabular-nums mt-1 ${
+              isLight ? 'text-emerald-700' : 'text-emerald-400'
+            }`}
+          >
             ₹{combinedSavings.toLocaleString('en-IN')}
           </div>
-          <div className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          <div
+            className={`text-[11px] mt-0.5 ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
             Across {negotiationRecords.length} verified negotiations
           </div>
         </div>
@@ -346,19 +370,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div
           className={`p-4 rounded-2xl border transition-all ${
             isLight
-              ? 'bg-white border-slate-200 shadow-xs'
-              : 'bg-[#0B101D] border border-slate-800'
+              ? 'bg-white border-slate-200 shadow-xs text-slate-900'
+              : 'bg-[#0B101D] border-slate-800 text-white'
           }`}
         >
-          <div className="text-[11px] font-mono uppercase text-slate-500">Active Products</div>
           <div
-            className={`text-xl sm:text-2xl font-mono font-extrabold mt-1 ${
-              isLight ? 'text-[#0f172a]' : 'text-white'
+            className={`text-[11px] font-mono uppercase tracking-wider font-semibold ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
+            Active Products
+          </div>
+          <div
+            className={`text-xl sm:text-2xl font-mono font-extrabold tabular-nums mt-1 ${
+              isLight ? 'text-[#0F172A]' : 'text-[#F8FAFC]'
             }`}
           >
             {products.length}
           </div>
-          <div className={`text-[11px] mt-0.5 ${isLight ? 'text-indigo-600 font-semibold' : 'text-indigo-400'}`}>
+          <div
+            className={`text-[11px] mt-0.5 ${
+              isLight ? 'text-indigo-700 font-semibold' : 'text-indigo-300 font-medium'
+            }`}
+          >
             {storeOwnerListedProducts.length} Store Owner QR verified
           </div>
         </div>
@@ -366,15 +400,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div
           className={`p-4 rounded-2xl border transition-all ${
             isLight
-              ? 'bg-white border-slate-200 shadow-xs'
-              : 'bg-[#0B101D] border border-slate-800'
+              ? 'bg-white border-slate-200 shadow-xs text-slate-900'
+              : 'bg-[#0B101D] border-slate-800 text-white'
           }`}
         >
-          <div className="text-[11px] font-mono uppercase text-slate-500">Category Rules</div>
-          <div className="text-xl sm:text-2xl font-mono font-extrabold text-amber-600 mt-1">
+          <div
+            className={`text-[11px] font-mono uppercase tracking-wider font-semibold ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
+            Category Rules
+          </div>
+          <div
+            className={`text-xl sm:text-2xl font-mono font-extrabold tabular-nums mt-1 ${
+              isLight ? 'text-amber-700' : 'text-amber-400'
+            }`}
+          >
             {categorySettings.length}
           </div>
-          <div className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          <div
+            className={`text-[11px] mt-0.5 ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
             Max Single Cap: {platformSettings.defaultMaxSingleDiscountPct}%
           </div>
         </div>
@@ -822,24 +870,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="space-y-5">
           {/* Reported Products Moderation */}
           {reportedProducts.length > 0 && (
-            <div className="rounded-3xl bg-[#0B101D] border border-rose-500/30 p-5 space-y-3">
-              <h3 className="font-display font-bold text-base text-white flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <div
+              className={`rounded-3xl border p-5 space-y-3 transition-colors ${
+                isLight
+                  ? 'bg-rose-50/60 border-rose-300 text-slate-900 shadow-sm'
+                  : 'bg-[#0B101D] border-rose-500/40 text-white'
+              }`}
+            >
+              <h3
+                className={`font-display font-bold text-base flex items-center gap-2 ${
+                  isLight ? 'text-rose-950' : 'text-[#F8FAFC]'
+                }`}
+              >
+                <AlertTriangle
+                  className={`w-4.5 h-4.5 ${
+                    isLight ? 'text-rose-700' : 'text-rose-400'
+                  }`}
+                />
                 <span>Reported Products Queue ({reportedProducts.length})</span>
               </h3>
               <div className="space-y-2">
                 {reportedProducts.map((rep) => (
                   <div
                     key={rep.id}
-                    className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors ${
+                      isLight
+                        ? 'bg-white border-rose-200 text-slate-900 shadow-xs'
+                        : 'bg-slate-900 border-slate-800 text-white'
+                    }`}
                   >
                     <div>
-                      <div className="font-bold text-white">
+                      <div
+                        className={`font-bold ${
+                          isLight ? 'text-slate-900' : 'text-[#F8FAFC]'
+                        }`}
+                      >
                         {rep.productName}{' '}
-                        <span className="text-slate-400 font-normal">({rep.sellerName})</span>
+                        <span
+                          className={`font-normal ${
+                            isLight ? 'text-slate-600' : 'text-slate-300'
+                          }`}
+                        >
+                          ({rep.sellerName})
+                        </span>
                       </div>
-                      <div className="text-[11px] text-rose-300 mt-0.5">
-                        Reason: {rep.reason} • Reported by {rep.reportedByEmail}
+                      <div
+                        className={`text-xs mt-1 font-medium ${
+                          isLight ? 'text-rose-700' : 'text-rose-300'
+                        }`}
+                      >
+                        Reason: <span className="font-semibold">{rep.reason}</span> • Reported by{' '}
+                        <span className={isLight ? 'text-slate-700' : 'text-slate-200'}>
+                          {rep.reportedByEmail}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -851,7 +934,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           );
                           notify(`Resolved report for "${rep.productName}".`);
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-semibold cursor-pointer"
+                        className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer transition-colors ${
+                          isLight
+                            ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'
+                            : 'bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-500/50'
+                        }`}
                       >
                         Dismiss Report
                       </button>
@@ -864,7 +951,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           );
                           notify(`Removed reported product "${rep.productName}".`);
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 font-semibold cursor-pointer"
+                        className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer transition-colors ${
+                          isLight
+                            ? 'bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300'
+                            : 'bg-rose-500/25 hover:bg-rose-500/35 text-rose-200 border border-rose-500/50'
+                        }`}
                       >
                         Remove Product
                       </button>
@@ -876,19 +967,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
 
           {/* Full Catalog Management */}
-          <div className="rounded-3xl bg-[#0B101D] border border-slate-800 p-5 space-y-4">
+          <div
+            className={`rounded-3xl border p-5 space-y-4 transition-colors ${
+              isLight
+                ? 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                : 'bg-[#0B101D] border-slate-800 text-white'
+            }`}
+          >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h2 className="font-display font-bold text-lg text-white">
+              <h2
+                className={`font-display font-bold text-lg ${
+                  isLight ? 'text-[#0F172A]' : 'text-[#F8FAFC]'
+                }`}
+              >
                 Platform Catalog ({filteredProducts.length})
               </h2>
               <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search
+                  className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${
+                    isLight ? 'text-slate-500' : 'text-slate-400'
+                  }`}
+                />
                 <input
                   type="text"
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   placeholder="Search products or sellers..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                  className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs focus:outline-none transition-colors ${
+                    isLight
+                      ? 'bg-white border border-slate-300 text-slate-900 placeholder-slate-500 focus:border-blue-600'
+                      : 'bg-slate-900 border border-slate-700 text-white placeholder-slate-400 focus:border-amber-400'
+                  }`}
                 />
               </div>
             </div>
@@ -896,7 +1005,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
+                  <tr
+                    className={`border-b text-[11px] font-mono uppercase tracking-wider font-semibold ${
+                      isLight
+                        ? 'border-slate-200 text-slate-600 bg-slate-50/60'
+                        : 'border-slate-800 text-slate-300'
+                    }`}
+                  >
                     <th className="py-2.5 px-3">Product</th>
                     <th className="py-2.5 px-3">Seller</th>
                     <th className="py-2.5 px-3 text-right">List Price</th>
@@ -904,24 +1019,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/70">
+                <tbody
+                  className={`divide-y ${
+                    isLight ? 'divide-slate-200' : 'divide-slate-800/70'
+                  }`}
+                >
                   {filteredProducts.slice(0, 20).map((prod) => (
-                    <tr key={prod.id} className="hover:bg-slate-900/50">
-                      <td className="py-2.5 px-3 font-semibold text-white">{prod.name}</td>
-                      <td className="py-2.5 px-3 text-slate-300">{prod.sellerName}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-white">
+                    <tr
+                      key={prod.id}
+                      className={`transition-colors ${
+                        isLight ? 'hover:bg-slate-50/80 text-slate-900' : 'hover:bg-slate-900/60 text-white'
+                      }`}
+                    >
+                      <td
+                        className={`py-2.5 px-3 font-semibold ${
+                          isLight ? 'text-slate-900' : 'text-[#F8FAFC]'
+                        }`}
+                      >
+                        {prod.name}
+                      </td>
+                      <td
+                        className={`py-2.5 px-3 ${
+                          isLight ? 'text-slate-700 font-medium' : 'text-[#CBD5E1]'
+                        }`}
+                      >
+                        {prod.sellerName}
+                      </td>
+                      <td
+                        className={`py-2.5 px-3 text-right font-mono tabular-nums ${
+                          isLight ? 'text-slate-900 font-bold' : 'text-[#F8FAFC] font-medium'
+                        }`}
+                      >
                         {editingId === prod.id ? (
                           <input
                             type="number"
                             value={tempPrice}
                             onChange={(e) => setTempPrice(Number(e.target.value))}
-                            className="w-24 px-2 py-1 rounded bg-slate-950 border border-amber-400 text-right text-white"
+                            className={`w-24 px-2 py-1 rounded text-right font-mono ${
+                              isLight
+                                ? 'bg-white border-2 border-blue-600 text-slate-900'
+                                : 'bg-slate-950 border-2 border-amber-400 text-white'
+                            }`}
                           />
                         ) : (
                           `₹${prod.listPrice.toLocaleString('en-IN')}`
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-emerald-400">
+                      <td
+                        className={`py-2.5 px-3 text-right font-mono tabular-nums font-bold ${
+                          isLight ? 'text-emerald-700' : 'text-emerald-400'
+                        }`}
+                      >
                         ₹{prod.minAcceptablePrice.toLocaleString('en-IN')}
                       </td>
                       <td className="py-2.5 px-3 text-right">
@@ -934,7 +1082,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 setEditingId(null);
                                 notify(`Updated price for ${prod.name}`);
                               }}
-                              className="p-1.5 rounded-lg bg-emerald-500 text-slate-950 cursor-pointer"
+                              className={`p-1.5 rounded-lg cursor-pointer ${
+                                isLight
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold'
+                              }`}
+                              title="Save Price"
                             >
                               <Check className="w-3.5 h-3.5" />
                             </button>
@@ -945,7 +1098,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 setEditingId(prod.id);
                                 setTempPrice(prod.listPrice);
                               }}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+                              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
+                                isLight
+                                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                  : 'bg-slate-800 hover:bg-slate-700 text-[#CBD5E1] border border-slate-700'
+                              }`}
+                              title="Edit Price"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -956,7 +1114,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               onDeleteProduct(prod.id);
                               notify(`Deleted product ${prod.name}`);
                             }}
-                            className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 cursor-pointer"
+                            className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
+                              isLight
+                                ? 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300'
+                                : 'bg-rose-500/20 hover:bg-rose-500/35 text-rose-300 border border-rose-500/40'
+                            }`}
+                            title="Delete Product"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -973,14 +1136,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB 5: NEGOTIATIONS AUDIT LOG */}
       {activeTab === 'negotiations' && (
-        <div className="rounded-3xl bg-[#0B101D] border border-slate-800 p-5 space-y-4">
-          <h2 className="font-display font-bold text-lg text-white">
+        <div
+          className={`rounded-3xl border p-5 space-y-4 transition-colors ${
+            isLight
+              ? 'bg-white border-slate-200 text-slate-900 shadow-sm'
+              : 'bg-[#0B101D] border-slate-800 text-white'
+          }`}
+        >
+          <h2
+            className={`font-display font-bold text-lg ${
+              isLight ? 'text-[#0F172A]' : 'text-[#F8FAFC]'
+            }`}
+          >
             Platform Negotiations Audit ({negotiationRecords.length})
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
+                <tr
+                  className={`border-b text-[11px] font-mono uppercase tracking-wider font-semibold ${
+                    isLight
+                      ? 'border-slate-200 text-slate-600 bg-slate-50/60'
+                      : 'border-slate-800 text-slate-300'
+                  }`}
+                >
                   <th className="py-2.5 px-3">Product</th>
                   <th className="py-2.5 px-3">Buyer</th>
                   <th className="py-2.5 px-3">Seller</th>
@@ -989,19 +1168,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <th className="py-2.5 px-3 text-right">Saved</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/70">
+              <tbody
+                className={`divide-y ${
+                  isLight ? 'divide-slate-200' : 'divide-slate-800/70'
+                }`}
+              >
                 {negotiationRecords.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-slate-900/50">
-                    <td className="py-2.5 px-3 font-semibold text-white">{rec.productName}</td>
-                    <td className="py-2.5 px-3 text-slate-300">{rec.userName}</td>
-                    <td className="py-2.5 px-3 text-slate-300">{rec.sellerName}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-400">
+                  <tr
+                    key={rec.id}
+                    className={`transition-colors ${
+                      isLight ? 'hover:bg-slate-50/80 text-slate-900' : 'hover:bg-slate-900/60 text-white'
+                    }`}
+                  >
+                    <td
+                      className={`py-2.5 px-3 font-semibold ${
+                        isLight ? 'text-slate-900' : 'text-[#F8FAFC]'
+                      }`}
+                    >
+                      {rec.productName}
+                    </td>
+                    <td
+                      className={`py-2.5 px-3 ${
+                        isLight ? 'text-slate-700 font-medium' : 'text-[#CBD5E1]'
+                      }`}
+                    >
+                      {rec.userName}
+                    </td>
+                    <td
+                      className={`py-2.5 px-3 ${
+                        isLight ? 'text-slate-700 font-medium' : 'text-[#CBD5E1]'
+                      }`}
+                    >
+                      {rec.sellerName}
+                    </td>
+                    <td
+                      className={`py-2.5 px-3 text-right font-mono tabular-nums ${
+                        isLight ? 'text-slate-600 line-through' : 'text-slate-300 line-through'
+                      }`}
+                    >
                       ₹{rec.originalPrice.toLocaleString('en-IN')}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">
+                    <td
+                      className={`py-2.5 px-3 text-right font-mono tabular-nums font-bold ${
+                        isLight ? 'text-emerald-700' : 'text-emerald-400'
+                      }`}
+                    >
                       ₹{rec.finalPrice.toLocaleString('en-IN')}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-cyan-400">
+                    <td
+                      className={`py-2.5 px-3 text-right font-mono tabular-nums font-bold ${
+                        isLight ? 'text-sky-700' : 'text-cyan-300'
+                      }`}
+                    >
                       ₹{rec.savedAmount.toLocaleString('en-IN')}
                     </td>
                   </tr>
@@ -1014,16 +1232,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB 6: PLATFORM SETTINGS */}
       {activeTab === 'settings' && (
-        <div className="rounded-3xl bg-[#0B101D] border border-slate-800 p-5 sm:p-6 space-y-5 max-w-2xl">
-          <h2 className="font-display font-bold text-lg text-white">
+        <div
+          className={`rounded-3xl border p-5 sm:p-6 space-y-5 max-w-2xl transition-colors ${
+            isLight
+              ? 'bg-white border-slate-200 text-slate-900 shadow-sm'
+              : 'bg-[#0B101D] border-slate-800 text-white'
+          }`}
+        >
+          <h2
+            className={`font-display font-bold text-lg ${
+              isLight ? 'text-[#0F172A]' : 'text-[#F8FAFC]'
+            }`}
+          >
             Global Platform & Security Settings
           </h2>
 
           <div className="space-y-4 text-xs">
-            <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 border border-slate-800 cursor-pointer">
-              <div>
-                <div className="font-bold text-white">Require Shop Owner Verification</div>
-                <div className="text-slate-400 mt-0.5">
+            <label
+              className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-colors ${
+                isLight
+                  ? 'bg-slate-50 hover:bg-slate-100/70 border-slate-200 text-slate-900'
+                  : 'bg-slate-900 hover:bg-slate-800/80 border-slate-800 text-white'
+              }`}
+            >
+              <div className="pr-4">
+                <div
+                  className={`font-bold text-sm ${
+                    isLight ? 'text-slate-900' : 'text-[#F8FAFC]'
+                  }`}
+                >
+                  Require Shop Owner Verification
+                </div>
+                <div
+                  className={`text-xs mt-1 leading-relaxed ${
+                    isLight ? 'text-slate-600' : 'text-[#CBD5E1]'
+                  }`}
+                >
                   New shop owner registrations require admin approval before listing products
                 </div>
               </div>
@@ -1036,14 +1280,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     requireShopOwnerApproval: e.target.checked,
                   }))
                 }
-                className="w-4 h-4 accent-amber-500"
+                className="w-5 h-5 accent-amber-500 shrink-0 cursor-pointer"
               />
             </label>
 
-            <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900 border border-slate-800 cursor-pointer">
-              <div>
-                <div className="font-bold text-white">Require Email Verification on Signup</div>
-                <div className="text-slate-400 mt-0.5">
+            <label
+              className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-colors ${
+                isLight
+                  ? 'bg-slate-50 hover:bg-slate-100/70 border-slate-200 text-slate-900'
+                  : 'bg-slate-900 hover:bg-slate-800/80 border-slate-800 text-white'
+              }`}
+            >
+              <div className="pr-4">
+                <div
+                  className={`font-bold text-sm ${
+                    isLight ? 'text-slate-900' : 'text-[#F8FAFC]'
+                  }`}
+                >
+                  Require Email Verification on Signup
+                </div>
+                <div
+                  className={`text-xs mt-1 leading-relaxed ${
+                    isLight ? 'text-slate-600' : 'text-[#CBD5E1]'
+                  }`}
+                >
                   Enforce email verification code confirmation for newly registered accounts
                 </div>
               </div>
@@ -1056,13 +1316,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     requireEmailVerification: e.target.checked,
                   }))
                 }
-                className="w-4 h-4 accent-amber-500"
+                className="w-5 h-5 accent-amber-500 shrink-0 cursor-pointer"
               />
             </label>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-1.5">
-                <label className="font-mono uppercase text-[10px] text-slate-400 block">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div
+                className={`p-4 rounded-2xl border space-y-2 ${
+                  isLight
+                    ? 'bg-slate-50 border-slate-200 text-slate-900'
+                    : 'bg-slate-900 border-slate-800 text-white'
+                }`}
+              >
+                <label
+                  className={`font-mono uppercase text-[11px] font-semibold tracking-wider block ${
+                    isLight ? 'text-slate-700' : 'text-[#CBD5E1]'
+                  }`}
+                >
                   Global Max Single Discount Cap (%)
                 </label>
                 <input
@@ -1076,12 +1346,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       defaultMaxSingleDiscountPct: Number(e.target.value) || 35,
                     }))
                   }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono"
+                  className={`w-full px-3.5 py-2.5 rounded-xl font-mono text-sm font-semibold transition-colors ${
+                    isLight
+                      ? 'bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600'
+                      : 'bg-slate-950 border border-slate-700 text-[#F8FAFC] focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400'
+                  }`}
                 />
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-1.5">
-                <label className="font-mono uppercase text-[10px] text-slate-400 block">
+              <div
+                className={`p-4 rounded-2xl border space-y-2 ${
+                  isLight
+                    ? 'bg-slate-50 border-slate-200 text-slate-900'
+                    : 'bg-slate-900 border-slate-800 text-white'
+                }`}
+              >
+                <label
+                  className={`font-mono uppercase text-[11px] font-semibold tracking-wider block ${
+                    isLight ? 'text-slate-700' : 'text-[#CBD5E1]'
+                  }`}
+                >
                   Global Max Bundle Discount Cap (%)
                 </label>
                 <input
@@ -1095,7 +1379,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       defaultMaxBundleDiscountPct: Number(e.target.value) || 40,
                     }))
                   }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono"
+                  className={`w-full px-3.5 py-2.5 rounded-xl font-mono text-sm font-semibold transition-colors ${
+                    isLight
+                      ? 'bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600'
+                      : 'bg-slate-950 border border-slate-700 text-[#F8FAFC] focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400'
+                  }`}
                 />
               </div>
             </div>
@@ -1103,7 +1391,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <button
               type="button"
               onClick={() => notify('Global platform settings saved and applied.')}
-              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer"
+              className={`px-6 py-3 rounded-xl font-bold text-xs sm:text-sm cursor-pointer transition-all shadow-md active:scale-95 ${
+                isLight
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20'
+                  : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
+              }`}
             >
               Save Platform Settings
             </button>
