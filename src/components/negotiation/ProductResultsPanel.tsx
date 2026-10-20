@@ -10,6 +10,7 @@ import { PriceSparkline } from '../common/PriceSparkline';
 import { CollectiveDealIndicator } from '../common/CollectiveDealIndicator';
 import { D3PriceTrendChart } from '../common/D3PriceTrendChart';
 import { VoiceNegotiationController } from './VoiceNegotiationController';
+import { BudgetConstraintWorkspaceBar } from './BudgetConstraintWorkspaceBar';
 import {
   DealHunterProductCandidate,
   NegotiationWorkspaceData,
@@ -81,6 +82,8 @@ interface ProductResultsPanelProps {
   isSearching: boolean;
   theme: ThemeConfig;
   userBudget?: number;
+  hasExplicitBudget?: boolean;
+  suggestedBudget?: number;
   onAdjustBudget?: (newBudget: number) => void;
   onBroadenSearch?: () => void;
   comparedProductIds?: string[];
@@ -128,6 +131,8 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
   isSearching,
   theme,
   userBudget,
+  hasExplicitBudget,
+  suggestedBudget,
   onAdjustBudget,
   onBroadenSearch,
   comparedProductIds = [],
@@ -483,6 +488,21 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
               </div>
             </div>
 
+            {/* Live Budget Constraint Bar with Color-Shifting Progress & Modification Highlight */}
+            <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+              <BudgetConstraintWorkspaceBar
+                targetPrice={targetPrice}
+                maxBudget={userBudget || activeNegotiation?.userBudget || currentActiveProduct.listPrice}
+                currentPrice={currentActiveProduct.listPrice}
+                floorPrice={activeNegotiation?.floorPrice}
+                onUpdateBudget={onVoiceUpdateBudget || onAdjustBudget}
+                onUpdateTarget={onVoiceUpdateTarget}
+                isLight={theme.isLight}
+                label="Workspace Budget Constraint"
+                showQuickPresets={!isCompleted}
+              />
+            </div>
+
             {/* Voice Command Controller for Active Negotiation Sessions */}
             {onVoiceUpdateTarget && onVoiceUpdateBudget && (
               <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
@@ -494,6 +514,7 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
                   onUpdateTargetPrice={onVoiceUpdateTarget}
                   onUpdateMaxBudget={onVoiceUpdateBudget}
                   disabled={isCompleted}
+                  isLight={theme.isLight}
                 />
               </div>
             )}
@@ -1617,6 +1638,15 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
                 Fallback Catalog
               </span>
             ) : null}
+            {hasExplicitBudget && userBudget && userBudget > 0 ? (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                Budget: ≤ ₹{userBudget.toLocaleString('en-IN')}
+              </span>
+            ) : (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-500/20">
+                All Prices
+              </span>
+            )}
           </div>
 
           {/* Side-by-side Compare Launcher if items selected */}
@@ -1747,17 +1777,27 @@ export const ProductResultsPanel: React.FC<ProductResultsPanelProps> = ({
             </div>
             <div className="space-y-1">
               <h4 className="font-display font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
-                {userBudget
+                {hasExplicitBudget && userBudget && userBudget > 0
                   ? `No exact matches found under ₹${userBudget.toLocaleString('en-IN')}`
-                  : 'No matching products found'}
+                  : `No matching products found for ${searchQuery ? `"${searchQuery}"` : 'your query'}`}
               </h4>
               <p className="text-xs max-w-sm mx-auto" style={{ color: 'var(--text-muted)' }}>
-                {userBudget
+                {hasExplicitBudget && userBudget && userBudget > 0
                   ? `I searched verified stores for products within ₹${userBudget.toLocaleString('en-IN')}, but couldn't find items in this price bracket. You can adjust your budget or search wider.`
-                  : "I couldn't find products matching your exact query. Try broadening your criteria or search wider."}
+                  : "I couldn't find products matching your query across searched stores. Try modifying your search keywords or checking the suggested category budget."}
               </p>
             </div>
             <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+              {suggestedBudget && (!hasExplicitBudget || !userBudget) && onAdjustBudget && (
+                <button
+                  type="button"
+                  onClick={() => onAdjustBudget(suggestedBudget)}
+                  className="px-3 py-1.5 rounded-xl text-white text-xs font-semibold cursor-pointer shadow-xs"
+                  style={{ backgroundColor: 'var(--accent)' }}
+                >
+                  Set Suggested Budget (₹{suggestedBudget.toLocaleString('en-IN')})
+                </button>
+              )}
               {onBroadenSearch && (
                 <button
                   type="button"

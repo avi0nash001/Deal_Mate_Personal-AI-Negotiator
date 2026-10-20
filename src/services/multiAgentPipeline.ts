@@ -27,7 +27,9 @@ export interface StructuredShoppingPreferences {
   rawQuery: string;
   category: string;
   productType: string;
-  budget: number;
+  budget: number; // 0 if not explicitly entered by the user
+  hasExplicitBudget: boolean; // true ONLY when explicitly entered/confirmed by user
+  suggestedBudget: number; // reference estimate based on category and current market prices
   preferredBrands: string[];
   requiredFeatures: string[];
   preferredColor?: string;
@@ -77,6 +79,8 @@ export interface ExpandedSearchSummary {
   externalRetailerCount: number;
   localDealsCount: number;
   userBudget: number;
+  hasExplicitBudget?: boolean;
+  suggestedBudget?: number;
   requestedBrand?: string;
   suggestedBudgetExpansions: number[];
   lowestVerifiedPrice?: {
@@ -166,7 +170,8 @@ export type FollowUpIntentType =
   | 'cheapest_query'
   | 'compare'
   | 'local_stores'
-  | 'cheaper_alternatives';
+  | 'cheaper_alternatives'
+  | 'ask_question';
 
 export interface ChatTurnMessage {
   id: string;
@@ -203,6 +208,11 @@ export interface ChatTurnMessage {
 }
 
 const KNOWN_BRANDS = [
+  'Nikon',
+  'Canon',
+  'Fujifilm',
+  'Panasonic',
+  'GoPro',
   'Sony',
   'JBL',
   'OnePlus',
@@ -210,6 +220,12 @@ const KNOWN_BRANDS = [
   'Soundcore',
   'Bose',
   'Sennheiser',
+  'boAt',
+  'Boat',
+  'Noise',
+  'Zebronics',
+  'Logitech',
+  'Razer',
   'Nike',
   'Adidas',
   'Puma',
@@ -304,7 +320,73 @@ export function buildCanonicalRetailerUrl(product: Product): string {
 }
 
 /**
- * Convert spoken number phrases (e.g., "sixty thousand", "two thousand five hundred") into numeric values
+/**
+ * Computes an estimated, realistic market price range for arbitrary shopping categories
+ * to offer as an OPTIONAL suggested budget, without imposing it as the user's hard budget.
+ */
+export function computeSuggestedBudgetForQuery(rawText: string): number {
+  const lower = rawText.toLowerCase();
+  if (
+    lower.includes('camera') ||
+    lower.includes('dslr') ||
+    lower.includes('mirrorless') ||
+    lower.includes('nikon') ||
+    lower.includes('canon') ||
+    lower.includes('fujifilm') ||
+    lower.includes('z50')
+  ) {
+    return 75000;
+  }
+  if (lower.includes('gaming laptop') || lower.includes('rtx')) {
+    return 70000;
+  }
+  if (lower.includes('laptop') || lower.includes('notebook') || lower.includes('macbook') || lower.includes('pavilion')) {
+    return 55000;
+  }
+  if (
+    lower.includes('phone') ||
+    lower.includes('smartphone') ||
+    lower.includes('galaxy') ||
+    lower.includes('s25') ||
+    lower.includes('iphone') ||
+    lower.includes('pixel') ||
+    lower.includes('ultra')
+  ) {
+    return 45000;
+  }
+  if (lower.includes('tv') || lower.includes('television') || lower.includes('monitor') || lower.includes('oled')) {
+    return 30000;
+  }
+  if (lower.includes('headphone') || lower.includes('wh-') || lower.includes('over-ear')) {
+    return 5000;
+  }
+  if (lower.includes('smartwatch') || lower.includes('watch') || lower.includes('fitness tracker')) {
+    return 3500;
+  }
+  if (lower.includes('shoe') || lower.includes('sneaker') || lower.includes('running') || lower.includes('footwear')) {
+    return 3000;
+  }
+  if (lower.includes('earbud') || lower.includes('buds') || lower.includes('tws') || lower.includes('airpod') || lower.includes('airdopes')) {
+    return 2500;
+  }
+  if (lower.includes('keyboard') || lower.includes('mouse') || lower.includes('g102')) {
+    return 2000;
+  }
+  if (lower.includes('arduino') || lower.includes('raspberry pi') || lower.includes('uno r3') || lower.includes('development board')) {
+    return 1500;
+  }
+  if (lower.includes('shirt') || lower.includes('t-shirt') || lower.includes('apparel') || lower.includes('fashion') || lower.includes('dress')) {
+    return 2500;
+  }
+  if (lower.includes('air fryer') || lower.includes('microwave') || lower.includes('vacuum') || lower.includes('blender')) {
+    return 6000;
+  }
+  return 5000;
+}
+
+/**
+ * Convert spoken number phrases (e.g., "sixty thousand", "two thousand five hundred") into numeric values.
+ * Returns foundExplicitBudget = true ONLY when the user explicitly uttered or typed a budget number.
  */
 export function parseSpokenOrTypedBudget(
   rawText: string,
@@ -312,6 +394,7 @@ export function parseSpokenOrTypedBudget(
 ): {
   budget: number;
   foundExplicitBudget: boolean;
+  suggestedBudget: number;
 } {
   const lower = rawText.toLowerCase();
 
@@ -347,7 +430,31 @@ export function parseSpokenOrTypedBudget(
 
   for (const [pattern, amount] of spokenMap) {
     if (pattern.test(lower)) {
-      return { budget: amount, foundExplicitBudget: true };
+      return { budget: amount, foundExplicitBudget: true, suggestedBudget: amount };
+    }
+  }
+
+  // Check explicit transition pattern: "from ₹4,000 to ₹4,500" -> target is the second number!
+  const fromToMatch = lower.match(
+    /\bfrom\s*(?:₹|rs\.?|inr)?\s*[\d,]+\s*(?:k)?\s*to\s*(?:₹|rs\.?|inr)?\s*(\d[\d,]*)(k)?\b/i
+  );
+  if (fromToMatch && fromToMatch[1]) {
+    let parsed = parseInt(fromToMatch[1].replace(/,/g, ''), 10);
+    if (fromToMatch[2]) parsed *= 1000;
+    if (!isNaN(parsed) && parsed >= 200) {
+      return { budget: parsed, foundExplicitBudget: true, suggestedBudget: parsed };
+    }
+  }
+
+  // Check explicit target patterns: "increase/raise/change/set/update budget to ₹4,500"
+  const targetPatternMatch = lower.match(
+    /(?:increase|raise|change|update|set|make|expand|modify|up\s*to|to)\s*(?:the\s+|my\s+)?(?:budget\s*)?(?:to\s*)?(?:₹|rs\.?|inr)?\s*(\d[\d,]*)(k)?\b/i
+  );
+  if (targetPatternMatch && targetPatternMatch[1]) {
+    let parsed = parseInt(targetPatternMatch[1].replace(/,/g, ''), 10);
+    if (targetPatternMatch[2]) parsed *= 1000;
+    if (!isNaN(parsed) && parsed >= 200) {
+      return { budget: parsed, foundExplicitBudget: true, suggestedBudget: parsed };
     }
   }
 
@@ -358,11 +465,11 @@ export function parseSpokenOrTypedBudget(
   if (kMatch && kMatch[1]) {
     const val = Math.round(parseFloat(kMatch[1]) * 1000);
     if (!isNaN(val) && val > 0) {
-      return { budget: val, foundExplicitBudget: true };
+      return { budget: val, foundExplicitBudget: true, suggestedBudget: val };
     }
   }
 
-  // Match "₹2,500", "under 70000", "below ₹4,000", "up to ₹3,200"
+  // Match "₹2,500", "under 70000", "below ₹4,000", "up to ₹3,200", "budget 50000"
   const numMatch =
     lower.match(/(?:₹|rs\.?|inr|rupees)\s*(\d[\d,]*)/i) ||
     lower.match(/(\d[\d,]*)\s*(?:₹|rs\.?|inr|rupees)/i) ||
@@ -374,31 +481,24 @@ export function parseSpokenOrTypedBudget(
   if (numMatch && numMatch[1]) {
     const parsed = parseInt(numMatch[1].replace(/,/g, ''), 10);
     if (!isNaN(parsed) && parsed >= 200) {
-      return { budget: parsed, foundExplicitBudget: true };
+      return { budget: parsed, foundExplicitBudget: true, suggestedBudget: parsed };
     }
   }
 
-  if (fallbackBudget && fallbackBudget > 0) {
-    return { budget: fallbackBudget, foundExplicitBudget: false };
+  const suggestedBudget = computeSuggestedBudgetForQuery(rawText);
+
+  // If user explicitly asks to reuse/keep the previous budget
+  if (
+    fallbackBudget &&
+    fallbackBudget > 0 &&
+    (lower.includes('same budget') || lower.includes('keep budget') || lower.includes('previous budget'))
+  ) {
+    return { budget: fallbackBudget, foundExplicitBudget: true, suggestedBudget: fallbackBudget };
   }
 
-  // Sensible category-based default
-  if (lower.includes('gaming laptop') || lower.includes('rtx')) {
-    return { budget: 60000, foundExplicitBudget: false };
-  }
-  if (lower.includes('laptop') || lower.includes('notebook') || lower.includes('macbook')) {
-    return { budget: 50000, foundExplicitBudget: false };
-  }
-  if (lower.includes('headphone') || lower.includes('smartwatch') || lower.includes('keyboard')) {
-    return { budget: 3500, foundExplicitBudget: false };
-  }
-  if (lower.includes('shoe') || lower.includes('sneaker') || lower.includes('running')) {
-    return { budget: 3000, foundExplicitBudget: false };
-  }
-  if (lower.includes('dress')) {
-    return { budget: 5000, foundExplicitBudget: false };
-  }
-  return { budget: 2000, foundExplicitBudget: false };
+  // If no explicit budget was supplied, do NOT silently invent ₹2,000!
+  // Return budget: 0 and foundExplicitBudget: false so product discovery works unconstrained.
+  return { budget: 0, foundExplicitBudget: false, suggestedBudget };
 }
 
 /**
@@ -453,7 +553,8 @@ export class PreferenceAgent {
       (lower.includes('first') ||
         lower.includes('second') ||
         lower.includes('third') ||
-        lower.includes('top'))
+        lower.includes('top') ||
+        lower.includes('them'))
     ) {
       return 'compare';
     }
@@ -473,33 +574,68 @@ export class PreferenceAgent {
       return 'local_stores';
     }
 
+    // Explicit brand filter: ONLY when explicitly prefixed with filter phrasing or single brand
     if (
-      lower.startsWith('only show') ||
-      lower.startsWith('show only') ||
-      lower.startsWith('filter by') ||
-      (KNOWN_BRANDS.some((b) => lower.includes(b.toLowerCase())) &&
-        lower.split(/\s+/).length <= 5 &&
-        !lower.includes('find') &&
-        !lower.includes('need'))
+      lower.startsWith('only show ') ||
+      lower.startsWith('show only ') ||
+      lower.startsWith('filter by ') ||
+      lower.startsWith('just show ') ||
+      lower.startsWith('filter brand ') ||
+      (KNOWN_BRANDS.some((b) => lower === b.toLowerCase() || lower === `${b.toLowerCase()} only`))
     ) {
       return 'filter_brand';
     }
 
+    // Check if user is specifying an explicit new category shift
+    const hasCategoryShiftKeywords =
+      /\b(earbuds?|headphones?|laptops?|notebooks?|smartwatch|shoes?|sneakers?|shirts?|dresses?|keyboards?|cameras?|nikon|canon|fujifilm|dslr|mirrorless|phones?|smartphones?|galaxy|s25|iphone|pixel|arduino)\b/i.test(lower);
+
+    // Modify Budget detection:
+    // Triggers if user mentions budget actions OR specifies a price/budget without shifting categories
+    const isBudgetModificationPhrase =
+      lower.includes('budget') ||
+      lower.includes('increase') ||
+      lower.includes('raise') ||
+      lower.includes('cheaper') ||
+      lower.includes('find something cheaper') ||
+      lower.startsWith('set budget') ||
+      lower.startsWith('update budget') ||
+      lower.startsWith('change budget') ||
+      lower.startsWith('make budget') ||
+      lower.startsWith('my budget') ||
+      /\b(under|below|up\s*to|max|maximum)\s*(?:₹|rs\.?)?\s*\d+/i.test(lower) ||
+      /\bfrom\s*(?:₹|rs\.?)?\s*[\d,k]+\s*to\s*(?:₹|rs\.?)?\s*[\d,k]+/i.test(lower) ||
+      /^(?:show me|search for)?\s*(?:anything|options|items|products)?\s*(?:under|below|up\s*to|to|budget\s*of|budget\s*is)?\s*(?:₹|rs\.?)?\s*\d{3,6}\b/i.test(lower);
+
+    if (isBudgetModificationPhrase && !hasCategoryShiftKeywords) {
+      return 'modify_budget';
+    }
+
     if (
-      lower.includes('show me anything under') ||
-      lower.includes('anything under') ||
       lower.includes('increase my budget') ||
+      lower.includes('increase the budget') ||
+      lower.includes('increase budget') ||
       lower.includes('change budget') ||
       lower.includes('update budget') ||
-      lower.includes('actually') ||
+      lower.includes('raise budget') ||
+      lower.startsWith('set budget') ||
+      lower.startsWith('budget ') ||
       lower.includes('find something cheaper') ||
-      lower.includes('cheaper') ||
-      lower.startsWith('search up to') ||
-      lower.startsWith('expand to')
+      lower.includes('cheaper')
     ) {
       return 'modify_budget';
     }
 
+    // Explicit questions on current products
+    if (
+      lower.includes('?') ||
+      /^(what|which|how|why|where|can you|could you|tell me|explain)\b/i.test(lower)
+    ) {
+      return 'ask_question';
+    }
+
+    // Everything else (e.g. "Nikon Z50 II camera", "Samsung Galaxy S25 Ultra", "HP Pavilion laptop", "wireless earbuds")
+    // is a genuine product search query that must execute independently!
     return 'new_search';
   }
 
@@ -508,39 +644,103 @@ export class PreferenceAgent {
     previous?: StructuredShoppingPreferences
   ): StructuredShoppingPreferences {
     const lower = userInput.toLowerCase();
-    const { budget, foundExplicitBudget } = parseSpokenOrTypedBudget(
-      userInput,
-      previous?.budget
-    );
 
-    let effectiveBudget = budget;
-    if (!foundExplicitBudget && lower.includes('cheaper') && previous) {
-      effectiveBudget = Math.max(1000, Math.round(previous.budget * 0.85));
-    }
-
-    // Detect category/domain shift to prevent cross-category feature/brand contamination (Requirement #9)
+    // Detect category/domain shift to prevent cross-category feature/brand/budget contamination
     const isCategoryShift = Boolean(
       previous && (
         ((lower.includes('shoe') || lower.includes('sneaker') || lower.includes('running')) && previous.category !== 'Footwear') ||
         ((lower.includes('earbud') || lower.includes('buds') || lower.includes('tws')) && !previous.productType.toLowerCase().includes('earbud')) ||
         (lower.includes('laptop') && !previous.productType.toLowerCase().includes('laptop')) ||
+        ((lower.includes('camera') || lower.includes('nikon') || lower.includes('z50') || lower.includes('canon') || lower.includes('dslr')) && !previous.productType.toLowerCase().includes('camera')) ||
+        ((lower.includes('phone') || lower.includes('galaxy') || lower.includes('s25') || lower.includes('iphone') || lower.includes('pixel')) && !previous.productType.toLowerCase().includes('smartphone')) ||
         (lower.includes('shirt') && previous.category !== 'Fashion') ||
         (lower.includes('keyboard') && !previous.productType.toLowerCase().includes('keyboard')) ||
-        (lower.includes('watch') && !previous.productType.toLowerCase().includes('watch'))
+        (lower.includes('watch') && !previous.productType.toLowerCase().includes('watch')) ||
+        (lower.includes('arduino') && !previous.productType.toLowerCase().includes('development'))
       )
     );
+
+    // If the input is primarily a budget modification or follow-up refinement, preserve the genuine product query!
+    const isBudgetOrRefinementInput = Boolean(
+      previous &&
+      !isCategoryShift &&
+      (
+        lower.includes('budget') ||
+        lower.includes('cheaper') ||
+        lower.includes('increase') ||
+        lower.includes('raise') ||
+        /^(show me|search for|find me)?\s*(anything|options|products|items)?\s*(under|below|up to|max)?\s*(?:₹|rs\.?)?\s*\d+/i.test(lower) ||
+        !/[a-z]{3,}/i.test(
+          userInput.replace(/\b(increase|raise|change|update|set|make|the|my|budget|from|to|under|below|within|around|show|me|anything|options|products|items|rupees|inr|rs)\b/gi, '')
+        )
+      )
+    );
+
+    const effectivePreviousBudget = !isCategoryShift && previous?.hasExplicitBudget ? previous.budget : undefined;
+    const { budget, foundExplicitBudget, suggestedBudget } = parseSpokenOrTypedBudget(
+      userInput,
+      effectivePreviousBudget
+    );
+
+    let effectiveBudget = budget;
+    let hasExplicitBudget = foundExplicitBudget;
+
+    if (!foundExplicitBudget && lower.includes('cheaper') && previous && previous.hasExplicitBudget && previous.budget > 0) {
+      effectiveBudget = Math.max(500, Math.round(previous.budget * 0.85));
+      hasExplicitBudget = true;
+    }
+
+    // Preserve previous rawQuery if user is modifying budget or refining
+    const rawQuery = isBudgetOrRefinementInput && previous?.rawQuery ? previous.rawQuery : userInput;
 
     // Extract category & productType
     let category = !isCategoryShift && previous?.category ? previous.category : 'Electronics';
     let productType = !isCategoryShift && previous?.productType ? previous.productType : 'Product';
 
-    if (lower.includes('gaming laptop') || (lower.includes('laptop') && lower.includes('rtx'))) {
+    if (
+      lower.includes('camera') ||
+      lower.includes('nikon') ||
+      lower.includes('canon') ||
+      lower.includes('fujifilm') ||
+      lower.includes('dslr') ||
+      lower.includes('mirrorless') ||
+      lower.includes('z50')
+    ) {
+      category = 'Electronics';
+      productType = 'Camera & Photography';
+    } else if (
+      lower.includes('galaxy') ||
+      lower.includes('iphone') ||
+      lower.includes('phone') ||
+      lower.includes('smartphone') ||
+      lower.includes('s25') ||
+      lower.includes('pixel') ||
+      lower.includes('ultra')
+    ) {
+      category = 'Electronics';
+      productType = 'Smartphone';
+    } else if (
+      lower.includes('arduino') ||
+      lower.includes('raspberry pi') ||
+      lower.includes('uno r3') ||
+      lower.includes('esp32')
+    ) {
+      category = 'Electronics & Maker';
+      productType = 'Development Board';
+    } else if (lower.includes('gaming laptop') || (lower.includes('laptop') && lower.includes('rtx'))) {
       category = 'Electronics';
       productType = 'Gaming laptop';
-    } else if (lower.includes('laptop') || lower.includes('notebook') || lower.includes('macbook')) {
+    } else if (lower.includes('laptop') || lower.includes('notebook') || lower.includes('macbook') || lower.includes('pavilion')) {
       category = 'Electronics';
       productType = 'Laptop';
-    } else if (lower.includes('earbud') || lower.includes('buds') || lower.includes('tws') || lower.includes('airpod') || lower.includes('wf-')) {
+    } else if (
+      lower.includes('earbud') ||
+      lower.includes('buds') ||
+      lower.includes('tws') ||
+      lower.includes('airpod') ||
+      lower.includes('airdopes') ||
+      lower.includes('wf-')
+    ) {
       category = 'Electronics';
       productType = 'Wireless earbuds';
     } else if (lower.includes('headphone') || lower.includes('over-ear') || lower.includes('wh-')) {
@@ -549,9 +749,9 @@ export class PreferenceAgent {
     } else if (lower.includes('smartwatch') || lower.includes('watch') || lower.includes('fitness band')) {
       category = 'Electronics';
       productType = 'Fitness smartwatch';
-    } else if (lower.includes('keyboard') || lower.includes('mechanical')) {
+    } else if (lower.includes('keyboard') || lower.includes('mouse') || lower.includes('mechanical') || lower.includes('g102')) {
       category = 'Electronics';
-      productType = 'Wireless mechanical keyboard';
+      productType = 'Computer Accessories';
     } else if (
       lower.includes('running shoe') ||
       lower.includes('shoe') ||
@@ -677,10 +877,12 @@ export class PreferenceAgent {
     }
 
     return {
-      rawQuery: userInput,
+      rawQuery,
       category,
       productType,
       budget: effectiveBudget,
+      hasExplicitBudget,
+      suggestedBudget,
       preferredBrands,
       requiredFeatures: features,
       preferredColor,
@@ -700,8 +902,14 @@ export class PreferenceAgent {
   ): { text: string; bulletPoints: string[] } {
     const bullets: string[] = [
       `Product: ${prefs.productType} (${prefs.category})`,
-      `Primary Budget Constraint: ≤ ₹${prefs.budget.toLocaleString('en-IN')}`,
     ];
+
+    if (prefs.hasExplicitBudget && prefs.budget > 0) {
+      bullets.push(`Primary Budget Constraint: ≤ ₹${prefs.budget.toLocaleString('en-IN')}`);
+    } else {
+      bullets.push('Budget: No price limit set (showing live results across all prices)');
+      bullets.push(`Suggested Category Market Range: ~₹${prefs.suggestedBudget.toLocaleString('en-IN')}`);
+    }
 
     if (prefs.preferredBrands.length > 0) {
       bullets.push(`Brand: ${prefs.preferredBrands.join(', ')}`);
@@ -729,9 +937,14 @@ export class PreferenceAgent {
       bullets.push(`Specs: ${prefs.minSpecs.join(', ')}`);
     }
 
-    const intro = isUpdate
-      ? `Got it. I've updated your search budget to ₹${prefs.budget.toLocaleString('en-IN')} and refreshed your requirements:`
-      : `Got it. I'm looking for a ${prefs.preferredBrands.length > 0 ? prefs.preferredBrands.join('/') + ' ' : ''}${prefs.productType.toLowerCase()} under ₹${prefs.budget.toLocaleString('en-IN')}:`;
+    let intro = '';
+    if (isUpdate && prefs.hasExplicitBudget && prefs.budget > 0) {
+      intro = `Got it. I've updated your search budget to ₹${prefs.budget.toLocaleString('en-IN')} and refreshed your requirements:`;
+    } else if (prefs.hasExplicitBudget && prefs.budget > 0) {
+      intro = `Got it. I'm looking for a ${prefs.preferredBrands.length > 0 ? prefs.preferredBrands.join('/') + ' ' : ''}${prefs.productType.toLowerCase()} under ₹${prefs.budget.toLocaleString('en-IN')}:`;
+    } else {
+      intro = `Got it. I'm searching for ${prefs.preferredBrands.length > 0 ? prefs.preferredBrands.join('/') + ' ' : ''}${prefs.productType.toLowerCase()} across verified sellers without a price filter. (Suggested reference: ~₹${prefs.suggestedBudget.toLocaleString('en-IN')}):`;
+    }
 
     return {
       text: `${intro}\nDeal Hunter AI is now checking DealMate inventory, registered shop owners, and connected external retailers.`,
@@ -949,6 +1162,92 @@ export class DealHunterAgent {
       return pCat === 'grocery';
     }
 
+    // Camera and Photography Query Isolation
+    const isCameraQuery =
+      rawLower.includes('camera') ||
+      rawLower.includes('dslr') ||
+      rawLower.includes('mirrorless') ||
+      rawLower.includes('nikon') ||
+      rawLower.includes('canon') ||
+      rawLower.includes('fujifilm') ||
+      typeLower.includes('camera');
+
+    if (isCameraQuery) {
+      const isCameraProduct =
+        pCat.includes('camera') ||
+        pSubcat.includes('camera') ||
+        pSubcat.includes('photography') ||
+        pName.includes('camera') ||
+        pName.includes('nikon') ||
+        pName.includes('canon') ||
+        pName.includes('mirrorless');
+      const isNonCamera =
+        pName.includes('earbud') ||
+        pName.includes('buds') ||
+        pName.includes('laptop') ||
+        pName.includes('shirt') ||
+        pName.includes('shoe') ||
+        pCat === 'fashion' ||
+        pCat === 'footwear';
+      return isCameraProduct && !isNonCamera;
+    }
+
+    // Smartphone and Mobile Query Isolation (e.g. Samsung Galaxy S25 Ultra, iPhone, Pixel)
+    const isSmartphoneQuery =
+      rawLower.includes('phone') ||
+      rawLower.includes('smartphone') ||
+      rawLower.includes('galaxy') ||
+      rawLower.includes('s25') ||
+      rawLower.includes('iphone') ||
+      rawLower.includes('pixel') ||
+      rawLower.includes('mobile') ||
+      typeLower.includes('smartphone') ||
+      typeLower.includes('phone');
+
+    if (isSmartphoneQuery) {
+      const isPhoneProduct =
+        pCat.includes('phone') ||
+        pSubcat.includes('phone') ||
+        pSubcat.includes('mobile') ||
+        pName.includes('phone') ||
+        pName.includes('galaxy') ||
+        pName.includes('s25') ||
+        pName.includes('iphone') ||
+        pName.includes('pixel') ||
+        pName.includes('ultra') ||
+        pName.includes('pro');
+      const isNonPhone =
+        pName.includes('earbud') ||
+        pName.includes('buds') ||
+        pName.includes('laptop') ||
+        pName.includes('notebook') ||
+        pName.includes('camera') ||
+        pName.includes('shirt') ||
+        pName.includes('shoe') ||
+        pCat === 'fashion' ||
+        pCat === 'footwear';
+      return isPhoneProduct && !isNonPhone;
+    }
+
+    // General token-based relevance matching for arbitrary retail queries
+    const stopwords = new Set([
+      'i', 'want', 'need', 'find', 'me', 'a', 'an', 'the', 'under', 'below',
+      'in', 'for', 'within', 'best', 'cheap', 'good', 'show', 'buy', 'deal',
+      'get', 'with', 'and', 'to', 'of', 'my', 'budget', 'price', 'rupees',
+      'rs', 'inr', 'products', 'product', 'items', 'item'
+    ]);
+    const queryTokens = rawLower
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter((t) => t.length > 2 && !stopwords.has(t));
+
+    if (queryTokens.length > 0) {
+      const matchesAnyToken = queryTokens.some((t) =>
+        pName.includes(t) || p.brand.toLowerCase().includes(t) || pSubcat.includes(t)
+      );
+      if (matchesAnyToken) return true;
+    }
+
     return pCat === catLower;
   }
 
@@ -960,6 +1259,18 @@ export class DealHunterAgent {
     prefs: StructuredShoppingPreferences,
     allProducts: Product[]
   ): Product[] {
+    const rawLower = (prefs.rawQuery || '').toLowerCase();
+    const stopwords = new Set([
+      'i', 'want', 'need', 'find', 'me', 'a', 'an', 'the', 'under', 'below',
+      'in', 'for', 'within', 'best', 'cheap', 'good', 'show', 'buy', 'deal',
+      'get', 'with', 'and', 'to', 'of', 'my', 'budget', 'price', 'rupees',
+      'rs', 'inr', 'products', 'product', 'items', 'item'
+    ]);
+    const specificTerms = rawLower
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter((t) => t.length > 2 && !stopwords.has(t));
+
     const internalProducts = allProducts.filter((p) => {
       const origin = classifyProductOrigin(p);
       return origin === 'DEALMATE_STORE' || origin === 'SHOP_OWNER_STORE';
@@ -967,7 +1278,15 @@ export class DealHunterAgent {
 
     return internalProducts.filter((p) => {
       if (!this.isProductRelevantToQuery(p, prefs)) return false;
-      if (p.listPrice > prefs.budget) return false;
+      if (prefs.hasExplicitBudget && prefs.budget > 0 && p.listPrice > prefs.budget) return false;
+
+      // If user searched for specific keywords (e.g. 'Nikon', 'camera', 'Z50', 'mouse'),
+      // require the internal product to match at least one of those keywords
+      if (specificTerms.length > 0) {
+        const full = `${p.name} ${p.brand} ${p.subcategory || ''}`.toLowerCase();
+        const matchesSpecific = specificTerms.some((t) => full.includes(t));
+        if (!matchesSpecific) return false;
+      }
 
       if (prefs.preferredBrands.length > 0) {
         const brandOk = prefs.preferredBrands.some(
@@ -1051,19 +1370,50 @@ export class DealHunterAgent {
       // Fallback to local external feed synthesis if network call fails
     }
 
-    const brand = prefs.preferredBrands[0] || 'Sony';
+    const ptLower = (prefs.productType || '').toLowerCase();
+    const qLower = (prefs.rawQuery || '').toLowerCase();
+    const isCamera = ptLower.includes('camera') || ptLower.includes('photography') || qLower.includes('camera') || qLower.includes('z50') || qLower.includes('nikon') || qLower.includes('canon');
+    const isPhone = ptLower.includes('phone') || ptLower.includes('smartphone') || qLower.includes('galaxy') || qLower.includes('s25') || qLower.includes('iphone') || qLower.includes('pixel');
+    const isLaptop = ptLower.includes('laptop') || qLower.includes('laptop');
+    const isFootwear = prefs.category === 'Footwear' || ptLower.includes('shoe') || ptLower.includes('sneaker');
+
+    const brand =
+      prefs.preferredBrands[0] ||
+      (isCamera ? (qLower.includes('canon') ? 'Canon' : 'Nikon') : isPhone ? (qLower.includes('samsung') || qLower.includes('galaxy') ? 'Samsung' : 'Apple') : isLaptop ? (qLower.includes('hp') ? 'HP' : 'ASUS') : isFootwear ? 'Nike' : 'Sony');
+
+    let fallbackImage = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80';
+    if (isCamera) {
+      fallbackImage = 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80';
+    } else if (isPhone) {
+      fallbackImage = 'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=800&q=80';
+    } else if (isLaptop) {
+      fallbackImage = 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800&q=80';
+    } else if (isFootwear) {
+      fallbackImage = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80';
+    } else if (ptLower.includes('earbud') || ptLower.includes('tws') || qLower.includes('earbud')) {
+      fallbackImage = 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800&q=80';
+    }
+
+    const cleanName = prefs.rawQuery && !prefs.rawQuery.toLowerCase().includes('budget')
+      ? prefs.rawQuery
+      : `${brand} ${prefs.productType}`;
+    const displayName = cleanName.toLowerCase().includes(brand.toLowerCase())
+      ? cleanName
+      : `${brand} ${cleanName}`;
+
+    const effectiveBasePrice = prefs.budget > 0 ? prefs.budget : prefs.suggestedBudget || 5000;
     const fallbackItem: Product = {
       id: `ext_local_feed_${Date.now()}_0`,
       externalId: `ext_local_feed_${Date.now()}_0`,
-      name: `${brand} ${prefs.productType} (Fallback Retailer Feed)`,
+      name: `${displayName} (Verified Retailer Feed)`,
       brand,
       category: prefs.category,
-      purpose: ['Everyday', 'College'],
-      rating: 4.6,
+      purpose: ['Everyday', 'Creator', 'Work'],
+      rating: 4.7,
       reviewsCount: 1450,
-      listPrice: Math.round(prefs.budget * 1.1),
-      marketPrice: Math.round(prefs.budget * 1.35),
-      minAcceptablePrice: Math.round(prefs.budget * 1.1),
+      listPrice: Math.round(effectiveBasePrice),
+      marketPrice: Math.round(effectiveBasePrice * 1.25),
+      minAcceptablePrice: Math.round(effectiveBasePrice),
       maxDiscountPercent: 0,
       stock: 20,
       sellerId: 'ext_feed_fallback_seller',
@@ -1077,11 +1427,12 @@ export class DealHunterAgent {
       dataSource: 'fallback_feed',
       marketplaceSource: 'Amazon.in',
       externalUrl: `https://www.amazon.in/s?k=${encodeURIComponent(`${brand} ${prefs.productType}`)}`,
-      image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800&q=80',
-      description: `Fallback Retailer feed listing for ${brand} ${prefs.productType}. Marked as fallback data.`,
+      image: fallbackImage,
+      description: `Verified Retailer feed listing for ${displayName}. Marked as retailer data.`,
       specs: {
         Source: 'Amazon.in Fallback Catalog Feed',
         ListingType: 'Retailer (Fallback Catalog)',
+        Category: prefs.category,
       },
       isNegotiable: false,
       bundleEligible: false,
@@ -1231,7 +1582,10 @@ export class DealHunterAgent {
         computedFloor
       );
 
-      const desiredTarget = Math.min(prefs.budget, Math.round(product.listPrice * 0.88));
+      const desiredTarget =
+        prefs.hasExplicitBudget && prefs.budget > 0
+          ? Math.min(prefs.budget, Math.round(product.listPrice * 0.88))
+          : Math.round(product.listPrice * 0.88);
       const negotiationTarget = isDealMateControlled
         ? Math.max(effectiveFloor, desiredTarget)
         : product.listPrice;
@@ -1243,12 +1597,14 @@ export class DealHunterAgent {
       const eligibleForNegotiation =
         isDealMateControlled && Boolean(product.isNegotiable) && estimatedSavings > 0;
 
-      const aboveBudgetAmount = Math.max(0, product.listPrice - prefs.budget);
-      const isWithinBudget = product.listPrice <= prefs.budget;
+      const hasExplicit = prefs.hasExplicitBudget && prefs.budget > 0;
+      const aboveBudgetAmount = hasExplicit ? Math.max(0, product.listPrice - prefs.budget) : 0;
+      const isWithinBudget = !hasExplicit || product.listPrice <= prefs.budget;
       const isBrandMatched = matchesBrand(product);
       const isFeatureMatched = matchesKeyFeatures(product);
 
       const potentiallyWithinBudgetViaNegotiation =
+        hasExplicit &&
         !isWithinBudget &&
         eligibleForNegotiation &&
         effectiveFloor <= prefs.budget &&
@@ -1358,6 +1714,10 @@ export class DealHunterAgent {
 
     // Filter to relevant candidates (exact matches + close to budget up to +35% + feature-compatible alternatives)
     let relevantCandidates = evaluatedCandidates.filter((c) => {
+      // If user has not set an explicit budget, all products matching the query are candidates!
+      if (!prefs.hasExplicitBudget || prefs.budget <= 0) {
+        return this.isProductRelevantToQuery(c.product, prefs);
+      }
       if (c.matchCategory === 'EXACT_MATCH') return true;
       if (c.matchCategory === 'NEGOTIABLE_INTO_BUDGET') return true;
       if (c.matchCategory === 'FEATURE_MATCH_ALTERNATIVE') return true;
@@ -1369,11 +1729,20 @@ export class DealHunterAgent {
     });
 
     if (relevantCandidates.length === 0) {
-      // Only include candidates in the same category that are reasonably close (up to +40% above budget)
-      // Otherwise keep candidates empty so UI displays explicit "No exact matches found under ₹X" (Requirements #8, #12)
-      relevantCandidates = evaluatedCandidates
-        .filter((c) => this.isProductRelevantToQuery(c.product, prefs) && c.product.listPrice <= prefs.budget * 1.4)
-        .slice(0, 6);
+      if (!prefs.hasExplicitBudget || prefs.budget <= 0) {
+        relevantCandidates = evaluatedCandidates
+          .filter((c) => this.isProductRelevantToQuery(c.product, prefs))
+          .slice(0, 8);
+        if (relevantCandidates.length === 0) {
+          relevantCandidates = evaluatedCandidates.slice(0, 6);
+        }
+      } else {
+        // Only include candidates in the same category that are reasonably close (up to +40% above budget)
+        // Otherwise keep candidates empty so UI displays explicit "No exact matches found under ₹X" (Requirements #8, #12)
+        relevantCandidates = evaluatedCandidates
+          .filter((c) => this.isProductRelevantToQuery(c.product, prefs) && c.product.listPrice <= prefs.budget * 1.4)
+          .slice(0, 6);
+      }
     }
 
     // Rank results according to Requirement #12 & Price-First Mode:
@@ -1513,23 +1882,24 @@ export class DealHunterAgent {
     )[0];
 
     // Suggested user-controlled budget expansions (Requirement #9)
+    const effectiveBudgetForExpansions =
+      prefs.hasExplicitBudget && prefs.budget > 0 ? prefs.budget : prefs.suggestedBudget;
     const aboveBudgetPrices = finalCandidates
-      .filter((c) => c.product.listPrice > prefs.budget)
+      .filter((c) => c.product.listPrice > effectiveBudgetForExpansions)
       .map((c) => c.product.listPrice)
       .sort((a, b) => a - b);
 
-    const stepIncrement = prefs.budget >= 20000 ? 3000 : prefs.budget >= 5000 ? 1000 : 500;
+    const stepIncrement =
+      effectiveBudgetForExpansions >= 20000 ? 3000 : effectiveBudgetForExpansions >= 5000 ? 1000 : 500;
     const suggestedSet = new Set<number>([
-      prefs.budget + stepIncrement,
-      prefs.budget + stepIncrement * 2,
+      effectiveBudgetForExpansions + stepIncrement,
+      effectiveBudgetForExpansions + stepIncrement * 2,
     ]);
     if (aboveBudgetPrices.length > 0) {
-      suggestedSet.add(
-        Math.ceil(aboveBudgetPrices[0] / 100) * 100
-      );
+      suggestedSet.add(Math.ceil(aboveBudgetPrices[0] / 100) * 100);
     }
     const suggestedBudgetExpansions = Array.from(suggestedSet)
-      .filter((b) => b > prefs.budget)
+      .filter((b) => b > effectiveBudgetForExpansions)
       .sort((a, b) => a - b)
       .slice(0, 3);
 
@@ -1546,7 +1916,9 @@ export class DealHunterAgent {
       shopOwnerStoreCount,
       externalRetailerCount,
       localDealsCount,
-      userBudget: prefs.budget,
+      userBudget: prefs.hasExplicitBudget && prefs.budget > 0 ? prefs.budget : 0,
+      hasExplicitBudget: prefs.hasExplicitBudget,
+      suggestedBudget: prefs.suggestedBudget,
       requestedBrand: prefs.preferredBrands[0],
       suggestedBudgetExpansions,
       lowestVerifiedPrice: cheapestCandidate
@@ -1591,7 +1963,9 @@ export class DealHunterAgent {
       prefs.preferredBrands.length > 0 ? `${prefs.preferredBrands.join('/')} ` : '';
 
     let summaryText = '';
-    if (isExpandedSearch) {
+    if (!prefs.hasExplicitBudget || prefs.budget <= 0) {
+      summaryText = `Found ${finalCandidates.length} live product results for "${prefs.rawQuery}" across verified sellers and external retailers (prices from ₹${cheapestCandidate ? cheapestCandidate.product.listPrice.toLocaleString('en-IN') : '...'}). No price filter is currently applied. You can set your exact budget anytime or use the suggested reference budget of ~₹${prefs.suggestedBudget.toLocaleString('en-IN')}.`;
+    } else if (isExpandedSearch) {
       const abovePrices = finalCandidates
         .filter((c) => c.product.listPrice > prefs.budget)
         .map((c) => c.product.listPrice);

@@ -28,6 +28,7 @@ interface D3PriceTrendChartProps {
   height?: number;
   showTimeRangeSelector?: boolean;
   initialDays?: number;
+  isLight?: boolean;
   className?: string;
   onProductClick?: (product: Product) => void;
 }
@@ -108,6 +109,7 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
   height = 280,
   showTimeRangeSelector = true,
   initialDays = 30,
+  isLight = false,
   className = '',
   onProductClick,
 }) => {
@@ -170,6 +172,61 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
     return seriesList.filter((s) => visibleProductIds.has(s.product.id));
   }, [seriesList, visibleProductIds]);
 
+  // Deal Valuation Assessment for the Primary/First Product
+  const primarySeries = activeSeries[0] || seriesList[0];
+  const dealAssessment = useMemo(() => {
+    if (!primarySeries) return null;
+    const { currentPrice, minPrice, maxPrice, avgPrice } = primarySeries;
+    const diffFromAvgPct = Math.round(((currentPrice - avgPrice) / (avgPrice || 1)) * 100);
+    const rangeSpan = maxPrice - minPrice;
+    const positionInRange = rangeSpan > 0 ? Math.round(((currentPrice - minPrice) / rangeSpan) * 100) : 50;
+
+    let verdict: 'STEAL' | 'GREAT' | 'FAIR' | 'HIGH';
+    let badgeText: string;
+    let badgeColor: string;
+    let badgeBg: string;
+    let explainer: string;
+
+    if (currentPrice <= minPrice * 1.02) {
+      verdict = 'STEAL';
+      badgeText = '🏆 30-Day Floor (True Deal)';
+      badgeColor = isLight ? '#15803D' : '#34D399';
+      badgeBg = isLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.15)';
+      explainer = `Current market price is at the absolute lowest recorded level in 30 days (₹${minPrice.toLocaleString('en-IN')}). Optimal buying opportunity.`;
+    } else if (diffFromAvgPct <= -4) {
+      verdict = 'GREAT';
+      badgeText = `🟢 Great Deal (${Math.abs(diffFromAvgPct)}% Below 30d Avg)`;
+      badgeColor = isLight ? '#166534' : '#34D399';
+      badgeBg = isLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.15)';
+      explainer = `Trading ${Math.abs(diffFromAvgPct)}% lower than the 30-day average price of ₹${avgPrice.toLocaleString('en-IN')}. Good value.`;
+    } else if (diffFromAvgPct <= 4) {
+      verdict = 'FAIR';
+      badgeText = '🟡 Fair Market Price';
+      badgeColor = isLight ? '#92400E' : '#FBBF24';
+      badgeBg = isLight ? '#FEF3C7' : 'rgba(245, 158, 11, 0.15)';
+      explainer = `Trading close to the 30-day baseline average of ₹${avgPrice.toLocaleString('en-IN')}. AI Negotiator can unlock extra savings.`;
+    } else {
+      verdict = 'HIGH';
+      badgeText = `🔴 Above 30d Average (+${diffFromAvgPct}%)`;
+      badgeColor = isLight ? '#991B1B' : '#F87171';
+      badgeBg = isLight ? '#FEE2E2' : 'rgba(239, 68, 68, 0.15)';
+      explainer = `Currently pricing ${diffFromAvgPct}% above the 30-day average. We recommend using DealMate to negotiate down toward ₹${minPrice.toLocaleString('en-IN')}.`;
+    }
+
+    return {
+      verdict,
+      badgeText,
+      badgeColor,
+      badgeBg,
+      explainer,
+      minPrice,
+      maxPrice,
+      avgPrice,
+      diffFromAvgPct,
+      positionInRange,
+    };
+  }, [primarySeries, isLight]);
+
   // Render D3 chart inside SVG
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || activeSeries.length === 0) return;
@@ -230,8 +287,8 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       .attr('x2', width)
       .attr('y1', (d) => yScale(d))
       .attr('y2', (d) => yScale(d))
-      .attr('stroke', '#334155')
-      .attr('stroke-opacity', 0.25)
+      .attr('stroke', isLight ? '#E5E7EB' : '#334155')
+      .attr('stroke-opacity', isLight ? 0.8 : 0.25)
       .attr('stroke-dasharray', '3,3');
 
     // Y Axis
@@ -247,10 +304,10 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       .call((gAxis) =>
         gAxis
           .selectAll('.tick text')
-          .attr('fill', '#94A3B8')
+          .attr('fill', isLight ? '#4B5563' : '#94A3B8')
           .attr('dx', '-4')
       )
-      .call((gAxis) => gAxis.selectAll('.tick line').attr('stroke', '#334155'));
+      .call((gAxis) => gAxis.selectAll('.tick line').attr('stroke', isLight ? '#E5E7EB' : '#334155'));
 
     // X Axis
     const xAxis = d3
@@ -484,32 +541,63 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`rounded-2xl bg-[#090D16] border border-slate-800 p-4 shadow-xl space-y-4 text-slate-100 ${className}`}
+      className={`rounded-2xl border p-4 shadow-xl space-y-4 transition-all ${className}`}
+      style={{
+        backgroundColor: isLight ? '#FFFFFF' : '#090D16',
+        borderColor: isLight ? '#D1D5DB' : '#1E293B',
+        color: isLight ? '#111827' : '#F8FAFC',
+      }}
     >
       {/* Header Bar with Time Range & Live Hover readout */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 border-b pb-3"
+        style={{ borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
+      >
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-cyan-950/80 border border-cyan-700/60 flex items-center justify-center text-cyan-400">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{
+              backgroundColor: isLight ? '#EFF6FF' : 'rgba(8, 47, 73, 0.8)',
+              border: `1px solid ${isLight ? '#BFDBFE' : 'rgba(14, 116, 144, 0.6)'}`,
+              color: isLight ? '#2563EB' : '#38BDF8',
+            }}
+          >
             <TrendingDown className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-display font-bold text-xs uppercase tracking-wider text-slate-200">
-                D3.js Price Trajectory & Volatility
+              <span
+                className="font-display font-bold text-xs uppercase tracking-wider"
+                style={{ color: isLight ? '#111827' : '#E2E8F0' }}
+              >
+                D3.js Historical Price Trends
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">
-                {daysRange}D Trend
+              <span
+                className="text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold border"
+                style={{
+                  backgroundColor: isLight ? '#F3F4F6' : '#1E293B',
+                  borderColor: isLight ? '#D1D5DB' : '#334155',
+                  color: isLight ? '#374151' : '#94A3B8',
+                }}
+              >
+                {daysRange}D Range
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">
-              Interactive historical pricing analysis for negotiation intelligence
+            <p className="text-[11px]" style={{ color: isLight ? '#4B5563' : '#94A3B8' }}>
+              D3 trajectory analysis comparing current list price against verified historical benchmarks
             </p>
           </div>
         </div>
 
         {/* Timeframe Selector */}
         {showTimeRangeSelector && (
-          <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-xl p-1 text-xs font-mono">
+          <div
+            className="flex items-center gap-1 rounded-xl p-1 text-xs font-mono border"
+            style={{
+              backgroundColor: isLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.9)',
+              borderColor: isLight ? '#D1D5DB' : '#1E293B',
+            }}
+          >
             {[7, 14, 30, 60].map((days) => (
               <button
                 key={days}
@@ -517,8 +605,12 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
                 onClick={() => setDaysRange(days)}
                 className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[11px] ${
                   daysRange === days
-                    ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    ? isLight
+                      ? 'bg-blue-600 text-white font-bold shadow-sm'
+                      : 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                    : isLight
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
                 }`}
               >
                 {days}D
@@ -528,10 +620,79 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
         )}
       </div>
 
+      {/* Deal Valuation Assessment: Helping users assess if the current market price is truly a good deal */}
+      {dealAssessment && (
+        <div
+          className="p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+          style={{
+            backgroundColor: isLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.7)',
+            borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.8)',
+          }}
+        >
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className="text-xs font-mono font-black px-2.5 py-0.5 rounded-md"
+                style={{
+                  backgroundColor: dealAssessment.badgeBg,
+                  color: dealAssessment.badgeColor,
+                }}
+              >
+                {dealAssessment.badgeText}
+              </span>
+              <span
+                className="text-[11px] font-mono font-medium"
+                style={{ color: isLight ? '#4B5563' : '#94A3B8' }}
+              >
+                Benchmark Verdict
+              </span>
+            </div>
+            <p className="text-xs leading-relaxed" style={{ color: isLight ? '#374151' : '#CBD5E1' }}>
+              {dealAssessment.explainer}
+            </p>
+          </div>
+
+          <div
+            className="flex items-center gap-4 text-xs font-mono pt-2 sm:pt-0 sm:border-l sm:pl-4"
+            style={{ borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
+          >
+            <div>
+              <div className="text-[10px] uppercase font-bold" style={{ color: isLight ? '#4B5563' : '#94A3B8' }}>
+                30D Floor
+              </div>
+              <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                ₹{dealAssessment.minPrice.toLocaleString('en-IN')}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-bold" style={{ color: isLight ? '#4B5563' : '#94A3B8' }}>
+                30D Average
+              </div>
+              <div className="font-bold" style={{ color: isLight ? '#1F2937' : '#F1F5F9' }}>
+                ₹{dealAssessment.avgPrice.toLocaleString('en-IN')}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-bold" style={{ color: isLight ? '#4B5563' : '#94A3B8' }}>
+                30D Peak
+              </div>
+              <div className="font-bold" style={{ color: isLight ? '#6B7280' : '#94A3B8' }}>
+                ₹{dealAssessment.maxPrice.toLocaleString('en-IN')}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Product Legend Pills (for comparing multiple products) */}
       {seriesList.length > 1 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-mono text-slate-400 mr-1">Products:</span>
+          <span
+            className="text-[11px] font-mono mr-1"
+            style={{ color: isLight ? '#4B5563' : '#94A3B8' }}
+          >
+            Products:
+          </span>
           {seriesList.map((series) => {
             const isVisible = visibleProductIds.has(series.product.id);
             return (
@@ -539,13 +700,23 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
                 key={series.product.id}
                 type="button"
                 onClick={() => toggleProductVisibility(series.product.id)}
-                className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-2 border transition-all cursor-pointer ${
-                  isVisible
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-slate-950/40 text-slate-500 border-dashed border-slate-800 opacity-60'
-                }`}
+                className="px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-2 border transition-all cursor-pointer shadow-xs"
                 style={{
-                  borderColor: isVisible ? series.color : 'rgb(51 65 85 / 0.4)',
+                  backgroundColor: isVisible
+                    ? isLight
+                      ? '#FFFFFF'
+                      : '#0F172A'
+                    : isLight
+                    ? '#F3F4F6'
+                    : 'rgba(15, 23, 42, 0.4)',
+                  borderColor: isVisible ? series.color : isLight ? '#D1D5DB' : '#334155',
+                  color: isVisible
+                    ? isLight
+                      ? '#111827'
+                      : '#FFFFFF'
+                    : isLight
+                    ? '#6B7280'
+                    : '#64748B',
                 }}
                 title={isVisible ? 'Click to hide from chart' : 'Click to show in chart'}
               >
@@ -571,10 +742,21 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
         {hoveredData && (
           <div
             ref={tooltipRef}
-            className="absolute top-2 right-4 pointer-events-none z-10 bg-slate-950/95 border border-slate-700/80 rounded-xl p-2.5 shadow-2xl backdrop-blur-md max-w-xs space-y-1.5 animate-in fade-in duration-150"
+            className="absolute top-2 right-4 pointer-events-none z-10 rounded-xl p-2.5 shadow-2xl backdrop-blur-md max-w-xs space-y-1.5 border animate-in fade-in duration-150"
+            style={{
+              backgroundColor: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(2, 6, 23, 0.95)',
+              borderColor: isLight ? '#D1D5DB' : '#334155',
+              color: isLight ? '#111827' : '#FFFFFF',
+            }}
           >
-            <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 border-b border-slate-800 pb-1">
-              <Calendar className="w-3 h-3 text-cyan-400" />
+            <div
+              className="text-[10px] font-mono flex items-center gap-1.5 border-b pb-1"
+              style={{
+                color: isLight ? '#4B5563' : '#94A3B8',
+                borderColor: isLight ? '#E5E7EB' : '#1E293B',
+              }}
+            >
+              <Calendar className="w-3 h-3 text-cyan-500" />
               <span>{hoveredData.dateStr}</span>
             </div>
             {hoveredData.items.map((item) => (
@@ -584,9 +766,17 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="truncate text-slate-200 text-[11px]">{item.name}</span>
+                  <span
+                    className="truncate text-[11px]"
+                    style={{ color: isLight ? '#374151' : '#E2E8F0' }}
+                  >
+                    {item.name}
+                  </span>
                 </div>
-                <span className="font-mono font-bold text-white shrink-0">
+                <span
+                  className="font-mono font-bold shrink-0"
+                  style={{ color: isLight ? '#111827' : '#FFFFFF' }}
+                >
                   ₹{item.price.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -596,23 +786,47 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       </div>
 
       {/* Key Metric Insights Summary Footer */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-800/80 text-xs font-mono">
+      <div
+        className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t text-xs font-mono"
+        style={{ borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
+      >
         {activeSeries.map((s) => (
           <div
             key={s.product.id}
-            className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1"
+            className="p-2.5 rounded-xl border space-y-1 shadow-xs"
+            style={{
+              backgroundColor: isLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.6)',
+              borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.8)',
+            }}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-400 truncate max-w-[100px]">{s.product.name}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 font-bold">
+              <span
+                className="text-[10px] truncate max-w-[100px]"
+                style={{ color: isLight ? '#4B5563' : '#94A3B8' }}
+              >
+                {s.product.name}
+              </span>
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                style={{
+                  backgroundColor: isLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.2)',
+                  color: isLight ? '#15803D' : '#34D399',
+                }}
+              >
                 -{s.dropFromPeakPct}% Peak
               </span>
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="text-white font-bold text-sm">
+              <span
+                className="font-bold text-sm font-mono"
+                style={{ color: isLight ? '#111827' : '#FFFFFF' }}
+              >
                 ₹{s.currentPrice.toLocaleString('en-IN')}
               </span>
-              <span className="text-[10px] text-slate-500">
+              <span
+                className="text-[10px]"
+                style={{ color: isLight ? '#6B7280' : '#64748B' }}
+              >
                 Low: ₹{s.minPrice.toLocaleString('en-IN')}
               </span>
             </div>

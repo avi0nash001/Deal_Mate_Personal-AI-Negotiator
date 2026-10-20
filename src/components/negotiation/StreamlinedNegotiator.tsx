@@ -23,6 +23,7 @@ import {
   AgentStageStatus,
   NegotiationWorkspaceData,
   parseSpokenOrTypedBudget,
+  computeSuggestedBudgetForQuery,
 } from '../../services/multiAgentPipeline';
 import {
   resolveCategorySetting,
@@ -40,6 +41,7 @@ import {
 } from './ProductResultsPanel';
 import { D3PriceTrendChart } from '../common/D3PriceTrendChart';
 import { ProductDetailsModal } from '../products/ProductDetailsModal';
+import { BudgetConstraintWorkspaceBar } from './BudgetConstraintWorkspaceBar';
 import {
   parseVoiceNegotiationCommand,
   speakVoiceFeedback,
@@ -1002,12 +1004,17 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
     }
 
     if (action.type === 'ADJUST_BUDGET' && action.targetPrice) {
-      handleUserSubmission(`Show me options under ₹${action.targetPrice}`, false);
+      handleUpdateBudget(action.targetPrice, 'Action Button');
       return;
     }
 
     if (action.type === 'QUICK_CHOICES' && action.choices && action.choices.length > 0) {
-      handleUserSubmission(`Budget ${action.choices[0]}`, false);
+      const { budget, foundExplicitBudget } = parseSpokenOrTypedBudget(action.choices[0]);
+      if (foundExplicitBudget) {
+        handleUpdateBudget(budget, 'Choice Option');
+      } else {
+        handleUserSubmission(action.choices[0], false);
+      }
       return;
     }
   };
@@ -1054,11 +1061,65 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
   };
 
   /**
-   * Verbally update max budget ceiling during active negotiation sessions
+   * Dedicated Budget Update Handler (Requirements #1, #2, #3, #4, #5)
+   * Preserves active product query, category, and selected product context.
+   * Updates only the budget and re-evaluates candidates/deals without reloading or resetting state.
    */
-  const handleVoiceUpdateMaxBudget = (newBudget: number) => {
-    const boundedBudget = Math.max(500, newBudget);
+  const handleUpdateBudget = async (newBudget: number, sourceLabel: string = 'Budget Update') => {
+    const boundedBudget = Math.max(200, Math.round(newBudget));
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const currentReqId = ++searchRequestIdRef.current;
 
+    // 1. Preserve current product query & category context
+    const activeQuery = currentSearchQuery || preferences?.rawQuery || selectedProduct?.name || 'camera';
+    const activeProductType = preferences?.productType || selectedProduct?.subcategory || 'Camera & Photography';
+    const activeCategory = preferences?.category || selectedProduct?.category || 'Electronics';
+
+    // 2. Add conversational turn indicating the budget change
+    setConversationHistory((prev) => [
+      ...prev,
+      {
+        id: `user_budget_${Date.now()}`,
+        role: 'user',
+        timestamp: nowTime,
+        text: sourceLabel.includes('Spoken') || sourceLabel.includes('Voice')
+          ? `🎤 Spoken Command: Updated budget to ₹${boundedBudget.toLocaleString('en-IN')}`
+          : `Updated budget to ₹${boundedBudget.toLocaleString('en-IN')}`,
+        isVoiceTranscript: sourceLabel.includes('Voice') || sourceLabel.includes('Spoken'),
+      },
+    ]);
+
+    // 3. Update preferences with new budget while strictly preserving product query & category
+    const updatedPrefs: StructuredShoppingPreferences = preferences
+      ? {
+          ...preferences,
+          budget: boundedBudget,
+          hasExplicitBudget: true,
+          rawQuery: activeQuery, // PRESERVE active query!
+          productType: activeProductType,
+          category: activeCategory,
+        }
+      : {
+          rawQuery: activeQuery,
+          productType: activeProductType,
+          category: activeCategory,
+          budget: boundedBudget,
+          hasExplicitBudget: true,
+          suggestedBudget: boundedBudget,
+          preferredBrands: [],
+          requiredFeatures: [],
+          quantity: 1,
+          condition: 'New',
+          deliveryPreference: 'Standard Delivery',
+          minSpecs: [],
+          dealPreferences: 'Best Value',
+          isPriceFirstMode: false,
+        };
+
+    setPreferences(updatedPrefs);
+    setIsPipelineRunning(true);
+
+    // Update active negotiation userBudget if currently negotiating
     setSessionState((prev) => {
       if (!prev.activeNegotiation) return prev;
       return {
@@ -1070,21 +1131,96 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
       };
     });
 
-    if (preferences) {
-      setPreferences((prev) => (prev ? { ...prev, budget: boundedBudget } : null));
-    }
+    // Update any inline negotiationWorkspace in conversation history to reflect updated budget constraint
+    setConversationHistory((prev) =>
+      prev.map((msg) =>
+        msg.negotiationWorkspace
+          ? {
+              ...msg,
+              negotiationWorkspace: {
+                ...msg.negotiationWorkspace,
+                userBudget: boundedBudget,
+              },
+            }
+          : msg
+      )
+    );
 
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setConversationHistory((prev) => [
-      ...prev,
-      {
-        id: `msg_voice_budget_${Date.now()}`,
-        role: 'user',
+    try {
+      setAgentStatus({
+        preference: 'completed',
+        dealHunter: 'active',
+        negotiator: 'idle',
+      });
+
+      // Run Deal Hunter with the PRESERVED product query and updated budget
+      const hunterOutput = await DealHunterAgent.searchWithExternalFallback(
+        updatedPrefs,
+        products,
+        categorySettings
+      );
+
+      // Stale request protection (Requirement #5)
+      if (currentReqId !== searchRequestIdRef.current) return;
+
+      // Update search results
+      setCurrentSearchResults(hunterOutput.candidates);
+      setSearchResults(hunterOutput.candidates);
+
+      // Add hunter response message
+      const hunterMsg: ChatTurnMessage = {
+        id: `hunter_budget_${Date.now()}`,
+        role: 'assistant',
+        agentLabel: 'Deal Hunter',
         timestamp: nowTime,
-        text: `🎤 Spoken Command: Updated max budget ceiling to ₹${boundedBudget.toLocaleString('en-IN')}`,
-        isVoiceTranscript: true,
-      },
-    ]);
+        text: `Refiltered verified listings for "${activeQuery}" up to ₹${boundedBudget.toLocaleString('en-IN')}. Found ${hunterOutput.candidates.length} matching options.`,
+        dealHunterSources: hunterOutput.sources,
+        expandedSearchSummary: hunterOutput.expandedSearchSummary,
+        isDemoDataNotice: true,
+        productCandidates: hunterOutput.candidates,
+      };
+      setConversationHistory((prev) => [...prev, hunterMsg]);
+
+      // Stage 03: Evaluate Negotiator deals
+      setAgentStatus({
+        preference: 'completed',
+        dealHunter: 'completed',
+        negotiator: 'active',
+      });
+
+      const negotiatorOutput = NegotiatorAgent.evaluateDeals(
+        updatedPrefs,
+        hunterOutput.candidates
+      );
+
+      const negMsg: ChatTurnMessage = {
+        id: `neg_budget_${Date.now()}`,
+        role: 'assistant',
+        agentLabel: 'Negotiator',
+        timestamp: nowTime,
+        text: negotiatorOutput.summaryText,
+        negotiatorCandidates: negotiatorOutput.eligibleCandidates,
+      };
+      setConversationHistory((prev) => [...prev, negMsg]);
+    } catch (err) {
+      console.error('[DealMate] Error updating budget:', err);
+    } finally {
+      if (currentReqId === searchRequestIdRef.current) {
+        setIsPipelineRunning(false);
+        setAgentStatus({
+          preference: 'completed',
+          dealHunter: 'completed',
+          negotiator: 'completed',
+        });
+      }
+    }
+  };
+
+  /**
+   * Verbally update max budget ceiling during active negotiation sessions
+   */
+  const handleVoiceUpdateMaxBudget = (newBudget: number) => {
+    handleUpdateBudget(newBudget, '🎤 Spoken Command');
   };
 
   /**
@@ -1129,13 +1265,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
       const expandedBudget = foundExplicitBudget
         ? explicitNewBudget
         : preferences.budget + stepIncrement;
-      setIsPipelineRunning(false);
-      await handleUserSubmission(
-        `Show me ${
-          preferences.preferredBrands.length > 0 ? preferences.preferredBrands.join(' ') + ' ' : ''
-        }${preferences.productType} up to ₹${expandedBudget}`,
-        isFromVoice
-      );
+      await handleUpdateBudget(expandedBudget, 'Expanded Budget');
       return;
     }
 
@@ -1231,12 +1361,17 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
             setCurrentSearchResults([]);
             setSearchResults([]);
 
+            const queryForPrefs = aiData.newSearchCriteria?.query || trimmed;
             const newBudget = aiData.newSearchCriteria?.budget;
+            const hasExpBudget = typeof newBudget === 'number' && newBudget > 0;
+            const suggestedBudget = computeSuggestedBudgetForQuery(queryForPrefs);
             const updatedPrefs: StructuredShoppingPreferences = {
-              rawQuery: aiData.newSearchCriteria?.query || trimmed,
+              rawQuery: queryForPrefs,
               category: aiData.newSearchCriteria?.category || 'Electronics',
               productType: aiData.newSearchCriteria?.productType || 'Product',
-              budget: newBudget || 2000,
+              budget: hasExpBudget ? newBudget : 0,
+              hasExplicitBudget: hasExpBudget,
+              suggestedBudget,
               preferredBrands: [],
               requiredFeatures: [],
               quantity: 1,
@@ -1448,136 +1583,158 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
       });
     }
 
-    // Stage 01: PREFERENCE AGENT
-    setAgentStatus({
-      preference: 'active',
-      dealHunter: 'idle',
-      negotiator: 'idle',
-    });
-
-    const updatedPrefs = PreferenceAgent.extractPreferences(
-      trimmed,
-      isRefinement && preferences ? preferences : undefined
-    );
-    setPreferences(updatedPrefs);
-
-    const prefReply = PreferenceAgent.buildResponse(updatedPrefs, isRefinement);
-    const prefMsgId = `pref_${Date.now()}`;
-    const prefTurn: ChatTurnMessage = {
-      id: prefMsgId,
-      role: 'assistant',
-      agentLabel: 'Preference Agent',
-      timestamp: nowTime,
-      text: prefReply.text,
-      bulletPoints: prefReply.bulletPoints,
-    };
-
-    setConversationHistory((prev) => [...prev, prefTurn]);
-
-    // Stage 02: DEAL HUNTER AGENT
-    setAgentStatus({
-      preference: 'completed',
-      dealHunter: 'active',
-      negotiator: 'idle',
-    });
-
-    await new Promise((r) => setTimeout(r, 320));
-
-    const hunterOutput = await DealHunterAgent.searchWithExternalFallback(
-      updatedPrefs,
-      products,
-      categorySettings
-    );
-
-    // Stale search protection: ignore if another search request started in the meantime (Requirement #10)
-    if (currentReqId !== searchRequestIdRef.current) return;
-
-    // Single source of truth update (Requirements #1, #2, #4, #5)
-    setCurrentSearchResults(hunterOutput.candidates);
-    setSearchResults(hunterOutput.candidates);
-    if (!autoNegotiateProduct && !trimmed.toLowerCase().includes('and negotiate') && !trimmed.toLowerCase().includes('lowest possible price')) {
-      setSessionState({
-        mode: 'discovery',
-        activeProduct: null,
-        activeCandidate: null,
-        activeNegotiation: null,
-        alternativeCandidates: [],
+    try {
+      // Stage 01: PREFERENCE AGENT
+      setAgentStatus({
+        preference: 'active',
+        dealHunter: 'idle',
+        negotiator: 'idle',
       });
-    }
 
-    const hunterMsgId = `hunter_${Date.now()}`;
-    const hunterTurn: ChatTurnMessage = {
-      id: hunterMsgId,
-      role: 'assistant',
-      agentLabel: 'Deal Hunter',
-      timestamp: nowTime,
-      text: hunterOutput.summaryText,
-      dealHunterSources: hunterOutput.sources,
-      expandedSearchSummary: hunterOutput.expandedSearchSummary,
-      isDemoDataNotice: true,
-      productCandidates: hunterOutput.candidates,
-    };
-
-    setConversationHistory((prev) => [...prev, hunterTurn]);
-
-    // Stage 03: NEGOTIATOR AGENT
-    setAgentStatus({
-      preference: 'completed',
-      dealHunter: 'completed',
-      negotiator: 'active',
-    });
-
-    await new Promise((r) => setTimeout(r, 280));
-
-    const negotiatorOutput = NegotiatorAgent.evaluateDeals(
-      updatedPrefs,
-      hunterOutput.candidates
-    );
-
-    const negMsgId = `neg_${Date.now()}`;
-    const negTurn: ChatTurnMessage = {
-      id: negMsgId,
-      role: 'assistant',
-      agentLabel: 'Negotiator',
-      timestamp: nowTime,
-      text: negotiatorOutput.summaryText,
-      negotiatorCandidates: negotiatorOutput.eligibleCandidates,
-    };
-
-    setConversationHistory((prev) => [...prev, negTurn]);
-    setAgentStatus({
-      preference: 'completed',
-      dealHunter: 'completed',
-      negotiator: 'completed',
-    });
-    setIsPipelineRunning(false);
-
-    if (autoPlayResponses && voiceEnabled) {
-      handlePlaySpeech(
-        negMsgId,
-        `${prefReply.text} ${hunterOutput.summaryText} ${negotiatorOutput.summaryText}`
+      const updatedPrefs = PreferenceAgent.extractPreferences(
+        trimmed,
+        isRefinement && preferences ? preferences : undefined
       );
-    }
+      setPreferences(updatedPrefs);
 
-    // If user explicitly asked to negotiate right away or came from a product card
-    const shouldAutoNegotiate =
-      Boolean(autoNegotiateProduct) ||
-      trimmed.toLowerCase().includes('lowest possible price') ||
-      trimmed.toLowerCase().includes('and negotiate');
+      const prefReply = PreferenceAgent.buildResponse(updatedPrefs, isRefinement);
+      const prefMsgId = `pref_${Date.now()}`;
+      const prefTurn: ChatTurnMessage = {
+        id: prefMsgId,
+        role: 'assistant',
+        agentLabel: 'Preference Agent',
+        timestamp: nowTime,
+        text: prefReply.text,
+        bulletPoints: prefReply.bulletPoints,
+      };
 
-    if (shouldAutoNegotiate) {
-      const negotiableCandidate =
-        hunterOutput.candidates.find(
-          (c) =>
-            c.eligibleForNegotiation &&
-            (!autoNegotiateProduct || c.product.id === autoNegotiateProduct.id)
-        ) || hunterOutput.candidates.find((c) => c.eligibleForNegotiation);
+      setConversationHistory((prev) => [...prev, prefTurn]);
 
-      if (negotiableCandidate) {
-        await startInlineProductNegotiation(
-          negotiableCandidate.product,
-          negotiableCandidate.negotiationTarget
+      // Stage 02: DEAL HUNTER AGENT
+      setAgentStatus({
+        preference: 'completed',
+        dealHunter: 'active',
+        negotiator: 'idle',
+      });
+
+      await new Promise((r) => setTimeout(r, 320));
+
+      const hunterOutput = await DealHunterAgent.searchWithExternalFallback(
+        updatedPrefs,
+        products,
+        categorySettings
+      );
+
+      // Stale search protection: ignore if another search request started in the meantime (Requirement #10)
+      if (currentReqId !== searchRequestIdRef.current) return;
+
+      // Single source of truth update (Requirements #1, #2, #4, #5)
+      setCurrentSearchResults(hunterOutput.candidates);
+      setSearchResults(hunterOutput.candidates);
+      if (!autoNegotiateProduct && !trimmed.toLowerCase().includes('and negotiate') && !trimmed.toLowerCase().includes('lowest possible price')) {
+        setSessionState({
+          mode: 'discovery',
+          activeProduct: null,
+          activeCandidate: null,
+          activeNegotiation: null,
+          alternativeCandidates: [],
+        });
+      }
+
+      const hunterMsgId = `hunter_${Date.now()}`;
+      const hunterTurn: ChatTurnMessage = {
+        id: hunterMsgId,
+        role: 'assistant',
+        agentLabel: 'Deal Hunter',
+        timestamp: nowTime,
+        text: hunterOutput.summaryText,
+        dealHunterSources: hunterOutput.sources,
+        expandedSearchSummary: hunterOutput.expandedSearchSummary,
+        isDemoDataNotice: true,
+        productCandidates: hunterOutput.candidates,
+      };
+
+      setConversationHistory((prev) => [...prev, hunterTurn]);
+
+      // Stage 03: NEGOTIATOR AGENT
+      setAgentStatus({
+        preference: 'completed',
+        dealHunter: 'completed',
+        negotiator: 'active',
+      });
+
+      await new Promise((r) => setTimeout(r, 280));
+
+      const negotiatorOutput = NegotiatorAgent.evaluateDeals(
+        updatedPrefs,
+        hunterOutput.candidates
+      );
+
+      const negMsgId = `neg_${Date.now()}`;
+      const negTurn: ChatTurnMessage = {
+        id: negMsgId,
+        role: 'assistant',
+        agentLabel: 'Negotiator',
+        timestamp: nowTime,
+        text: negotiatorOutput.summaryText,
+        negotiatorCandidates: negotiatorOutput.eligibleCandidates,
+      };
+
+      setConversationHistory((prev) => [...prev, negTurn]);
+      setAgentStatus({
+        preference: 'completed',
+        dealHunter: 'completed',
+        negotiator: 'completed',
+      });
+
+      if (autoPlayResponses && voiceEnabled) {
+        handlePlaySpeech(
+          negMsgId,
+          `${prefReply.text} ${hunterOutput.summaryText} ${negotiatorOutput.summaryText}`
         );
+      }
+
+      // If user explicitly asked to negotiate right away or came from a product card
+      const shouldAutoNegotiate =
+        Boolean(autoNegotiateProduct) ||
+        trimmed.toLowerCase().includes('lowest possible price') ||
+        trimmed.toLowerCase().includes('and negotiate');
+
+      if (shouldAutoNegotiate) {
+        const negotiableCandidate =
+          hunterOutput.candidates.find(
+            (c) =>
+              c.eligibleForNegotiation &&
+              (!autoNegotiateProduct || c.product.id === autoNegotiateProduct.id)
+          ) || hunterOutput.candidates.find((c) => c.eligibleForNegotiation);
+
+        if (negotiableCandidate) {
+          await startInlineProductNegotiation(
+            negotiableCandidate.product,
+            negotiableCandidate.negotiationTarget
+          );
+        }
+      }
+    } catch (err) {
+      console.error('[StreamlinedNegotiator] Pipeline execution error:', err);
+      if (currentReqId === searchRequestIdRef.current) {
+        const errTurn: ChatTurnMessage = {
+          id: `err_${Date.now()}`,
+          role: 'assistant',
+          agentLabel: 'Deal Hunter',
+          timestamp: nowTime,
+          text: `I encountered an unexpected issue searching for "${trimmed}". Please try again or check your connection.`,
+        };
+        setConversationHistory((prev) => [...prev, errTurn]);
+        setAgentStatus({
+          preference: 'completed',
+          dealHunter: 'completed',
+          negotiator: 'idle',
+        });
+      }
+    } finally {
+      if (currentReqId === searchRequestIdRef.current) {
+        setIsPipelineRunning(false);
       }
     }
   };
@@ -2795,10 +2952,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
                                               key={newBudget}
                                               type="button"
                                               onClick={() =>
-                                                handleUserSubmission(
-                                                  `Show me anything under ₹${newBudget}`,
-                                                  false
-                                                )
+                                                handleUpdateBudget(newBudget, 'Expanded Budget')
                                               }
                                               className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold cursor-pointer transition-colors"
                                             >
@@ -2825,25 +2979,44 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
                                         Set New Budget
                                       </button>
 
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleUserSubmission(
-                                            `Keep ₹${msg.expandedSearchSummary!.userBudget} and show similar alternatives`,
-                                            false
+                                      {msg.expandedSearchSummary.userBudget > 0 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleUpdateBudget(
+                                              msg.expandedSearchSummary!.userBudget,
+                                              'Keep Budget'
+                                            )
+                                          }
+                                          className={`px-3 py-1.5 rounded-xl border text-xs font-medium cursor-pointer ${
+                                            theme.isLight
+                                              ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
+                                              : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400'
+                                          }`}
+                                        >
+                                          Keep ₹
+                                          {msg.expandedSearchSummary.userBudget.toLocaleString(
+                                            'en-IN'
+                                          )}
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleUpdateBudget(
+                                              msg.expandedSearchSummary!.suggestedBudget || 5000,
+                                              'Suggested Budget'
+                                            )
+                                          }
+                                          className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold cursor-pointer transition-colors"
+                                        >
+                                          Use Suggested Budget (~₹
+                                          {(msg.expandedSearchSummary.suggestedBudget || 5000).toLocaleString(
+                                            'en-IN'
+                                          )}
                                           )
-                                        }
-                                        className={`px-3 py-1.5 rounded-xl border text-xs font-medium cursor-pointer ${
-                                          theme.isLight
-                                            ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
-                                            : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400'
-                                        }`}
-                                      >
-                                        Keep ₹
-                                        {msg.expandedSearchSummary.userBudget.toLocaleString(
-                                          'en-IN'
-                                        )}
-                                      </button>
+                                        </button>
+                                      )}
                                     </div>
 
                                     {customBudgetMsgId === msg.id && (
@@ -2851,10 +3024,10 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
                                         onSubmit={(e) => {
                                           e.preventDefault();
                                           if (customBudgetInput.trim()) {
-                                            handleUserSubmission(
-                                              `Show me anything under ₹${customBudgetInput.trim()}`,
-                                              false
-                                            );
+                                            const val = Number(customBudgetInput.trim());
+                                            if (!isNaN(val) && val > 0) {
+                                              handleUpdateBudget(val, 'Custom Budget');
+                                            }
                                             setCustomBudgetMsgId(null);
                                             setCustomBudgetInput('');
                                           }
@@ -3119,6 +3292,25 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
                                     </div>
                                   </div>
                                 </div>
+
+                                {/* Dynamic Budget Constraint Bar with Color Shift & Modification Highlight */}
+                                <BudgetConstraintWorkspaceBar
+                                  targetPrice={msg.negotiationWorkspace.targetPrice}
+                                  maxBudget={
+                                    preferences?.budget ||
+                                    msg.negotiationWorkspace.userBudget ||
+                                    sessionState.activeNegotiation?.userBudget ||
+                                    msg.negotiationWorkspace.currentPrice
+                                  }
+                                  currentPrice={msg.negotiationWorkspace.currentPrice}
+                                  floorPrice={msg.negotiationWorkspace.floorPrice}
+                                  onUpdateBudget={(newBudget) => handleUpdateBudget(newBudget, 'Inline Workspace')}
+                                  onUpdateTarget={handleVoiceUpdateTargetPrice}
+                                  isLight={theme.isLight}
+                                  compact={true}
+                                  label="Budget Ceiling Constraint"
+                                  showQuickPresets={msg.negotiationWorkspace.status === 'NEGOTIATING'}
+                                />
 
                                 {/* Buyer AI <-> Seller AI Status */}
                                 <div
@@ -3767,16 +3959,15 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
             onSelectAlternative={handleSelectAlternative}
             isSearching={isPipelineRunning}
             theme={theme}
-            userBudget={preferences?.budget}
+            userBudget={preferences?.hasExplicitBudget ? preferences.budget : undefined}
+            hasExplicitBudget={preferences?.hasExplicitBudget}
+            suggestedBudget={preferences?.suggestedBudget}
             onAdjustBudget={(newBudget) => {
-              handleUserSubmission(
-                `Show me ${preferences?.productType || 'products'} up to ₹${newBudget}`,
-                false
-              );
+              handleUpdateBudget(newBudget, 'Panel Budget Update');
             }}
             onBroadenSearch={() => {
               handleUserSubmission(
-                `Show me popular alternatives for ${preferences?.productType || 'wireless earbuds'}`,
+                `Show me popular alternatives for ${preferences?.productType || currentSearchQuery || 'camera'}`,
                 false
               );
             }}
@@ -3856,34 +4047,34 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
               </button>
             </div>
 
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className={`text-xs leading-relaxed ${theme.isLight ? 'text-slate-700' : 'text-slate-300'}`}>
               {inspectDealProduct.product.description}
             </p>
 
             <div
               className={`p-3 rounded-xl border space-y-1.5 text-xs font-mono ${
                 theme.isLight
-                  ? 'bg-slate-50 border-slate-200'
+                  ? 'bg-slate-50 border-slate-300'
                   : 'bg-slate-900 border-slate-800'
               }`}
             >
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Original / MRP:</span>
-                <span className="line-through">
+                <span className={theme.isLight ? 'text-slate-600' : 'text-slate-400'}>Original / MRP:</span>
+                <span className={`line-through ${theme.isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                   ₹{inspectDealProduct.product.marketPrice.toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Current Seller Price:</span>
-                <span className="font-bold">
+                <span className={theme.isLight ? 'text-slate-600' : 'text-slate-400'}>Current Seller Price:</span>
+                <span className={`font-bold ${theme.isLight ? 'text-slate-900' : 'text-white'}`}>
                   ₹{inspectDealProduct.product.listPrice.toLocaleString('en-IN')}
                 </span>
               </div>
-              <div className="flex justify-between text-emerald-600 font-bold">
+              <div className={`flex justify-between font-bold ${theme.isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>
                 <span>AI Negotiation Target:</span>
                 <span>₹{inspectDealProduct.negotiationTarget.toLocaleString('en-IN')}</span>
               </div>
-              <div className="flex justify-between text-blue-600">
+              <div className={`flex justify-between ${theme.isLight ? 'text-blue-700 font-semibold' : 'text-blue-400'}`}>
                 <span>Potential Savings:</span>
                 <span>₹{inspectDealProduct.estimatedSavings.toLocaleString('en-IN')}</span>
               </div>
@@ -3891,7 +4082,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
 
             {/* D3 Historical Price Trend Visualization in Inspect Deal Modal */}
             <div className="space-y-1.5">
-              <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase">
+              <span className={`text-[10px] font-mono font-bold uppercase ${theme.isLight ? 'text-blue-700' : 'text-cyan-400'}`}>
                 Historical Price Trends (D3.js)
               </span>
               <D3PriceTrendChart

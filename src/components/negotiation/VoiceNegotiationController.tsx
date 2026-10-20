@@ -8,6 +8,9 @@ import {
   AlertCircle,
   TrendingDown,
   Wallet,
+  RotateCcw,
+  X,
+  Square,
 } from 'lucide-react';
 import {
   parseVoiceNegotiationCommand,
@@ -23,6 +26,7 @@ interface VoiceNegotiationControllerProps {
   onUpdateMaxBudget: (newBudget: number) => void;
   disabled?: boolean;
   compact?: boolean;
+  isLight?: boolean;
 }
 
 export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProps> = ({
@@ -34,21 +38,22 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
   onUpdateMaxBudget,
   disabled = false,
   compact = false,
+  isLight = false,
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [lastActionFeedback, setLastActionFeedback] = useState<{
     text: string;
-    type: 'target' | 'budget';
+    type: 'target' | 'budget' | 'unrecognized';
   } | null>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Clear feedback badge after 5 seconds
+  // Clear feedback badge after 6 seconds
   useEffect(() => {
     if (lastActionFeedback) {
       const timer = setTimeout(() => {
         setLastActionFeedback(null);
-      }, 5000);
+      }, 6000);
       return () => clearTimeout(timer);
     }
   }, [lastActionFeedback]);
@@ -89,6 +94,7 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
       recognition.onstart = () => {
         setIsListening(true);
         setInterimTranscript('Listening...');
+        setLastActionFeedback(null);
       };
 
       recognition.onresult = (event: any) => {
@@ -130,7 +136,7 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
           } else {
             setLastActionFeedback({
               text: `Heard "${finalTranscript.trim()}". Try: "Target ₹1,800" or "Budget ₹2,500"`,
-              type: 'target',
+              type: 'unrecognized',
             });
           }
 
@@ -142,6 +148,10 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
 
       recognition.onerror = () => {
         stopListening();
+        setLastActionFeedback({
+          text: 'Microphone input ended or had an error. Tap retry to speak again.',
+          type: 'unrecognized',
+        });
       };
 
       recognition.onend = () => {
@@ -188,44 +198,51 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
     <div
       className={`rounded-2xl border transition-all ${
         isListening
-          ? 'bg-cyan-950/40 border-cyan-500 shadow-lg shadow-cyan-950/50'
-          : 'bg-[#0B0F19] border-slate-800'
-      } ${compact ? 'p-2.5' : 'p-3.5'} space-y-2.5`}
+          ? 'bg-gradient-to-r from-[#0C233F] via-[#0E1F38] to-[#0A1A2F] border-cyan-400 shadow-xl shadow-cyan-950/60 ring-1 ring-cyan-400/40'
+          : isLight
+          ? 'bg-slate-100 border-slate-300 shadow-sm'
+          : 'bg-[#0E172A] border-slate-700/90 shadow-md'
+      } ${compact ? 'p-3 space-y-2.5' : 'p-3.5 sm:p-4 space-y-3'}`}
     >
       {/* Header & Main Toggle */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={handleToggle}
             disabled={disabled}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-400 ${
               isListening
-                ? 'bg-rose-500 text-white animate-pulse shadow-md shadow-rose-500/40 scale-105'
-                : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/40'
+                ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-lg shadow-rose-500/50 scale-105 border border-rose-400 ring-2 ring-rose-400/40'
+                : 'bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 border border-cyan-400/60 hover:border-cyan-300 shadow-sm'
             }`}
             title={isListening ? 'Stop listening' : 'Start voice command'}
+            aria-label={isListening ? 'Stop listening' : 'Start voice command'}
           >
             {isListening ? (
-              <MicOff className="w-4 h-4 text-white" />
+              <MicOff className="w-5 h-5 text-white" />
             ) : (
-              <Mic className="w-4 h-4" />
+              <Mic className="w-5 h-5 text-cyan-300" />
             )}
           </button>
 
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-display font-bold text-white flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-xs sm:text-sm font-display font-bold tracking-wide flex items-center gap-1.5 ${
+                  isLight ? 'text-slate-900' : 'text-white'
+                }`}
+              >
                 <span>Voice Command Assistant</span>
                 {isListening && (
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
                 )}
               </span>
             </div>
-            <p className="text-[11px] font-mono text-slate-400">
+            <p className="text-xs font-mono text-slate-300 font-medium mt-0.5">
               {isListening ? (
-                <span className="text-cyan-300 font-semibold animate-pulse">
-                  {interimTranscript || 'Listening for target price or budget...'}
+                <span className="text-cyan-300 font-semibold animate-pulse flex items-center gap-1">
+                  <span>Listening... Speak target price or max budget</span>
                 </span>
               ) : (
                 'Verbally update target price or max budget'
@@ -235,33 +252,62 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
         </div>
 
         {/* Live Audio Visualizer waves when listening */}
-        {isListening && (
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-950/60 border border-rose-800/60 text-rose-300 text-[10px] font-mono">
-            <span className="w-1 h-3 bg-rose-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1 h-4 bg-rose-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1 h-2 bg-rose-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-            <span className="ml-1 font-bold">SPEAK NOW</span>
+        {isListening ? (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-950/90 border border-rose-600 text-rose-200 text-xs font-mono font-bold shadow-md shadow-rose-950/60">
+            <span className="w-1.5 h-3.5 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-5 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-3 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <span className="ml-1 tracking-wider">SPEAK NOW</span>
+            <button
+              type="button"
+              onClick={stopListening}
+              className="ml-1 p-0.5 rounded hover:bg-rose-900 text-rose-200 cursor-pointer"
+              title="Stop Recording"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+            </button>
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={startListening}
+            disabled={disabled}
+            className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/60 text-cyan-300 text-xs font-mono font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span>Start Listening</span>
+          </button>
         )}
       </div>
 
+      {/* Live Interim Transcript Display */}
+      {isListening && interimTranscript && (
+        <div className="px-3 py-2 rounded-xl bg-[#08101E] border border-cyan-500/60 text-xs font-mono text-cyan-200 flex items-center gap-2 shadow-inner">
+          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+          <span className="text-cyan-400 font-bold">Heard:</span>
+          <span className="italic truncate">&ldquo;{interimTranscript}&rdquo;</span>
+        </div>
+      )}
+
       {/* Verbal Command Hints */}
-      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-slate-400">
-        <span className="text-slate-500 text-[10px] uppercase">Say:</span>
+      <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-200 pt-1 border-t border-slate-700/80">
+        <span className="text-slate-300 text-[10px] uppercase font-bold tracking-wider">
+          Quick Voice Actions:
+        </span>
         <button
           type="button"
           onClick={() => handleQuickPreset('target', -100)}
-          className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors cursor-pointer flex items-center gap-1"
+          className="px-2.5 py-1 rounded-xl bg-[#141F36] hover:bg-[#1B2B4A] active:bg-[#111A2D] border border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-cyan-200 text-xs font-mono font-medium shadow-xs transition-all flex items-center gap-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-400"
         >
-          <TrendingDown className="w-3 h-3 text-cyan-400" />
+          <TrendingDown className="w-3.5 h-3.5 text-cyan-400" />
           <span>"Target ₹{(currentTargetPrice - 100).toLocaleString('en-IN')}"</span>
         </button>
         <button
           type="button"
           onClick={() => handleQuickPreset('budget', 500)}
-          className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-amber-500/50 hover:text-amber-300 transition-colors cursor-pointer flex items-center gap-1"
+          className="px-2.5 py-1 rounded-xl bg-[#141F36] hover:bg-[#1B2B4A] active:bg-[#111A2D] border border-slate-700 hover:border-amber-400 text-slate-200 hover:text-amber-200 text-xs font-mono font-medium shadow-xs transition-all flex items-center gap-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-400"
         >
-          <Wallet className="w-3 h-3 text-amber-400" />
+          <Wallet className="w-3.5 h-3.5 text-amber-400" />
           <span>"Budget ₹{(currentMaxBudget + 500).toLocaleString('en-IN')}"</span>
         </button>
       </div>
@@ -269,14 +315,43 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
       {/* Confirmation feedback banner */}
       {lastActionFeedback && (
         <div
-          className={`px-3 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-2 animate-in fade-in duration-200 ${
+          className={`px-3 py-2 rounded-xl border text-xs font-mono flex items-center justify-between gap-2 shadow-md animate-in fade-in duration-200 ${
             lastActionFeedback.type === 'target'
-              ? 'bg-cyan-950/40 border-cyan-700/60 text-cyan-300'
-              : 'bg-amber-950/40 border-amber-700/60 text-amber-300'
+              ? 'bg-cyan-950/80 border-cyan-500/80 text-cyan-200'
+              : lastActionFeedback.type === 'budget'
+              ? 'bg-amber-950/80 border-amber-500/80 text-amber-200'
+              : 'bg-slate-900 border-slate-600 text-slate-200'
           }`}
         >
-          <Check className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-          <span className="truncate">{lastActionFeedback.text}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            {lastActionFeedback.type === 'unrecognized' ? (
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+            ) : (
+              <Check className="w-4 h-4 shrink-0 text-emerald-400" />
+            )}
+            <span className="truncate font-medium">{lastActionFeedback.text}</span>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {lastActionFeedback.type === 'unrecognized' && (
+              <button
+                type="button"
+                onClick={startListening}
+                className="px-2 py-0.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Retry</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setLastActionFeedback(null)}
+              className="p-1 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white cursor-pointer"
+              title="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       )}
     </div>

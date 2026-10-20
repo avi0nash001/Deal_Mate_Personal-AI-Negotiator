@@ -61,6 +61,7 @@ export interface Product {
   externalId?: string;
   isStoreOwnerListed?: boolean;
   isLiveGoogleSearch?: boolean;
+  isSerpApiLive?: boolean;
   isFallbackData?: boolean;
   isCached?: boolean;
   dataSource?: string;

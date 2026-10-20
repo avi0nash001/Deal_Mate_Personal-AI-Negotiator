@@ -259,13 +259,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl rounded-3xl border border-emerald-500/40 bg-gradient-to-b from-[#0D161F] via-[#090E17] to-[#06080E] p-6 shadow-2xl shadow-emerald-950/60 text-slate-100 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl rounded-3xl border border-[#E2E8F0] bg-white p-6 shadow-2xl shadow-slate-900/20 text-[#0F172A] max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={onClose}
           disabled={isProcessing}
-          className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-30"
+          className="absolute top-5 right-5 p-2 rounded-full text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors cursor-pointer disabled:opacity-30"
+          title="Close checkout"
         >
           <X className="w-5 h-5" />
         </button>
@@ -273,15 +274,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Top Header & Gateway Status Badge */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-950 border border-emerald-700/60 flex items-center justify-center text-emerald-400">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shadow-xs">
               <Lock className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-display font-bold text-lg text-white">
+              <h2 className="font-display font-bold text-lg text-[#0F172A]">
                 Checkout & Secure Payment
               </h2>
-              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400">
-                <ShieldCheck className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-2 text-xs font-mono text-emerald-700 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>
                   Settled Unit Price: ₹{unitPrice.toLocaleString('en-IN')} · Category Floor: ₹
                   {effectiveFloor.toLocaleString('en-IN')}
@@ -294,15 +295,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="flex items-center gap-2">
             {razorpayConfig?.isConfigured ? (
               <div
-                className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 border ${
+                className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 border shadow-xs ${
                   razorpayConfig.mode === 'live'
-                    ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
-                    : 'bg-amber-950/80 border-amber-500/60 text-amber-300'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                    : 'bg-amber-50 border-amber-300 text-amber-800'
                 }`}
               >
                 <div
                   className={`w-1.5 h-1.5 rounded-full ${
-                    razorpayConfig.mode === 'live' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                    razorpayConfig.mode === 'live' ? 'bg-emerald-600' : 'bg-amber-500 animate-pulse'
                   }`}
                 />
                 <span>
@@ -310,30 +311,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </span>
               </div>
             ) : (
-              <div className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 border bg-slate-900 border-slate-700 text-slate-300">
-                <KeyRound className="w-3 h-3 text-cyan-400" />
+              <div className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 border bg-slate-100 border-slate-200 text-slate-700 shadow-xs">
+                <KeyRound className="w-3 h-3 text-cyan-600" />
                 <span>Razorpay Gateway Ready</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Deal Summary Banner + Quantity Control */}
-        <div className="mt-4 p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* Deal Summary Banner + Quantity Control (#F8FAFC) */}
+        <div className="mt-4 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
               src={product.image}
               alt={product.name}
               referrerPolicy="no-referrer"
-              className="w-14 h-14 rounded-xl object-cover bg-slate-900 border border-slate-700"
+              className="w-14 h-14 rounded-xl object-cover bg-white border border-[#E2E8F0] shadow-xs"
             />
             <div>
-              <h4 className="text-xs font-bold text-white line-clamp-1">{product.name}</h4>
-              <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Seller: <span className="text-emerald-300 font-bold">{product.sellerName}</span>
+              <h4 className="text-xs font-bold text-[#0F172A] line-clamp-1">{product.name}</h4>
+              <p className="text-xs text-[#64748B] font-mono mt-0.5">
+                Seller: <span className="text-emerald-700 font-bold">{product.sellerName}</span>
               </p>
               <div className="flex items-center gap-2 mt-2">
-                <span className="text-[11px] font-mono text-slate-300">Quantity:</span>
+                <span className="text-xs font-mono text-[#334155] font-semibold">Quantity:</span>
                 <input
                   type="number"
                   min={1}
@@ -343,20 +344,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   onChange={(e) =>
                     setQuantity(Math.max(1, Math.min(product.stock || 10, Number(e.target.value) || 1)))
                   }
-                  className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 font-mono text-xs text-white text-center"
+                  className="w-16 px-2.5 py-1 rounded-lg bg-white border border-[#CBD5E1] font-mono text-xs text-[#0F172A] text-center focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-xs"
                 />
               </div>
             </div>
           </div>
 
-          <div className="text-right sm:border-l sm:border-emerald-500/20 sm:pl-4">
-            <div className="text-xs text-slate-400 line-through font-mono">
+          <div className="text-right sm:border-l sm:border-[#E2E8F0] sm:pl-4">
+            <div className="text-xs text-[#94A3B8] line-through font-mono">
               ₹{(dealToken.originalPrice * quantity).toLocaleString('en-IN')}
             </div>
-            <div className="text-2xl font-extrabold font-mono text-emerald-400">
+            <div className="text-2xl font-extrabold font-mono text-emerald-700">
               ₹{totalPaid.toLocaleString('en-IN')}
             </div>
-            <div className="text-[11px] font-mono text-emerald-300 font-semibold">
+            <div className="text-[11px] font-mono text-emerald-700 font-semibold">
               You Save ₹{totalSaved.toLocaleString('en-IN')}
             </div>
           </div>
@@ -364,38 +365,38 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         {/* Error notification */}
         {orderError && (
-          <div className="mt-4 p-3.5 rounded-2xl bg-rose-950/70 border border-rose-500/50 text-rose-200 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+          <div className="mt-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-2.5 shadow-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
             <div className="flex-1">
-              <div className="font-bold">Transaction Notice</div>
-              <div className="mt-0.5 text-rose-300/90">{orderError}</div>
+              <div className="font-bold text-rose-950">Transaction Notice</div>
+              <div className="mt-0.5 text-rose-800">{orderError}</div>
             </div>
           </div>
         )}
 
         {/* Missing Razorpay credentials helper banner */}
         {missingConfigHelp && (
-          <div className="mt-4 p-4 rounded-2xl bg-slate-900/90 border border-cyan-500/40 text-xs space-y-3">
-            <div className="flex items-center gap-2 text-cyan-300 font-bold">
-              <KeyRound className="w-4 h-4" />
+          <div className="mt-4 p-4 rounded-2xl bg-[#F8FAFC] border border-cyan-200 text-xs space-y-3 shadow-xs">
+            <div className="flex items-center gap-2 text-cyan-800 font-bold">
+              <KeyRound className="w-4 h-4 text-cyan-600" />
               <span>Razorpay Credentials Setup Guide</span>
             </div>
-            <p className="text-slate-300 leading-relaxed">
+            <p className="text-[#334155] leading-relaxed">
               DealMate uses the official Razorpay Standard Checkout SDK. To activate live or test card/UPI payments:
             </p>
-            <ol className="list-decimal list-inside space-y-1 text-slate-400 font-mono text-[11px]">
+            <ol className="list-decimal list-inside space-y-1 text-[#64748B] font-mono text-[11px]">
               <li>
-                Log in to <span className="text-cyan-300">dashboard.razorpay.com</span>
+                Log in to <span className="text-cyan-700 font-semibold">dashboard.razorpay.com</span>
               </li>
               <li>Toggle the header switch to <strong>Test Mode</strong></li>
               <li>Go to <strong>Settings &gt; API Keys</strong> and click <strong>Generate Key</strong></li>
               <li>
-                Add <code className="text-emerald-400">RAZORPAY_KEY_ID</code> and{' '}
-                <code className="text-emerald-400">RAZORPAY_KEY_SECRET</code> to your server environment (.env)
+                Add <code className="text-emerald-800 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">RAZORPAY_KEY_ID</code> and{' '}
+                <code className="text-emerald-800 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">RAZORPAY_KEY_SECRET</code> to your server environment (.env)
               </li>
             </ol>
             <div className="flex items-center justify-between pt-1">
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-[#64748B]">
                 Or select <strong>Cash on Delivery</strong> below to test checkout immediately.
               </span>
               <button
@@ -405,7 +406,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   setOrderError(null);
                   setMissingConfigHelp(false);
                 }}
-                className="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg font-mono text-xs cursor-pointer"
+                className="px-3 py-1 bg-cyan-100 hover:bg-cyan-200 text-cyan-900 border border-cyan-300 rounded-lg font-mono text-xs cursor-pointer font-semibold transition-colors"
               >
                 Switch to COD
               </button>
@@ -417,14 +418,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         <form onSubmit={handleSubmitOrder} className="mt-6 space-y-5">
           {/* Shipping Details */}
           <div>
-            <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <Truck className="w-3.5 h-3.5 text-cyan-400" />
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#0F172A] mb-3 flex items-center gap-2">
+              <Truck className="w-4 h-4 text-cyan-600 shrink-0" />
               <span>Shipping & Delivery Destination</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                <label className="block text-xs text-[#334155] mb-1.5 font-mono font-semibold">
                   Full Name
                 </label>
                 <input
@@ -433,12 +434,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   value={fullName}
                   disabled={isProcessing}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                  placeholder="Enter full name"
+                  className="w-full px-3 py-2 bg-white border border-[#CBD5E1] hover:border-slate-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs text-[#0F172A] placeholder:text-[#94A3B8] outline-none transition-colors shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                <label className="block text-xs text-[#334155] mb-1.5 font-mono font-semibold">
                   Phone Number
                 </label>
                 <input
@@ -447,12 +449,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   value={phone}
                   disabled={isProcessing}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
+                  placeholder="+91..."
+                  className="w-full px-3 py-2 bg-white border border-[#CBD5E1] hover:border-slate-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs text-[#0F172A] placeholder:text-[#94A3B8] outline-none font-mono transition-colors shadow-xs"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                <label className="block text-xs text-[#334155] mb-1.5 font-mono font-semibold">
                   Street Address
                 </label>
                 <input
@@ -461,24 +464,26 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   value={address}
                   disabled={isProcessing}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                  placeholder="House/Flat, Street, Area"
+                  className="w-full px-3 py-2 bg-white border border-[#CBD5E1] hover:border-slate-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs text-[#0F172A] placeholder:text-[#94A3B8] outline-none transition-colors shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">City</label>
+                <label className="block text-xs text-[#334155] mb-1.5 font-mono font-semibold">City</label>
                 <input
                   type="text"
                   required
                   value={city}
                   disabled={isProcessing}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                  placeholder="City"
+                  className="w-full px-3 py-2 bg-white border border-[#CBD5E1] hover:border-slate-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs text-[#0F172A] placeholder:text-[#94A3B8] outline-none transition-colors shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                <label className="block text-xs text-[#334155] mb-1.5 font-mono font-semibold">
                   Postal Code
                 </label>
                 <input
@@ -487,7 +492,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   value={postalCode}
                   disabled={isProcessing}
                   onChange={(e) => setPostalCode(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
+                  placeholder="6-digit PIN"
+                  className="w-full px-3 py-2 bg-white border border-[#CBD5E1] hover:border-slate-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs text-[#0F172A] placeholder:text-[#94A3B8] outline-none font-mono transition-colors shadow-xs"
                 />
               </div>
             </div>
@@ -496,84 +502,105 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {/* Payment Method Selector */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
+              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#0F172A] flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-cyan-600 shrink-0" />
                 <span>Payment Option (Razorpay Gateway)</span>
               </h3>
-              <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
+              <span className="text-xs font-mono text-emerald-700 font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 INR (₹) Standard Checkout
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
                 type="button"
                 disabled={isProcessing}
                 onClick={() => setPaymentMethod('UPI')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                   paymentMethod === 'UPI'
-                    ? 'border-emerald-400 bg-emerald-950/40 text-white shadow-md shadow-emerald-950/40'
-                    : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
+                    ? 'border-emerald-600 bg-emerald-50/80 text-[#0F172A] shadow-sm ring-2 ring-emerald-600/20'
+                    : 'border-[#E2E8F0] bg-white text-[#334155] hover:border-slate-300 hover:bg-[#F8FAFC]'
                 }`}
               >
-                <div className="text-xs font-bold font-mono">Instant UPI</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">GPay / PhonePe / Paytm</div>
+                <div className="text-xs font-bold font-mono text-[#0F172A] flex items-center justify-between">
+                  <span>Instant UPI</span>
+                  {paymentMethod === 'UPI' && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 shadow-xs shadow-emerald-500" />
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 font-sans ${paymentMethod === 'UPI' ? 'text-emerald-800 font-medium' : 'text-[#64748B]'}`}>
+                  GPay / PhonePe / Paytm
+                </div>
               </button>
 
               <button
                 type="button"
                 disabled={isProcessing}
                 onClick={() => setPaymentMethod('CREDIT_CARD')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                   paymentMethod === 'CREDIT_CARD'
-                    ? 'border-emerald-400 bg-emerald-950/40 text-white shadow-md shadow-emerald-950/40'
-                    : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
+                    ? 'border-emerald-600 bg-emerald-50/80 text-[#0F172A] shadow-sm ring-2 ring-emerald-600/20'
+                    : 'border-[#E2E8F0] bg-white text-[#334155] hover:border-slate-300 hover:bg-[#F8FAFC]'
                 }`}
               >
-                <div className="text-xs font-bold font-mono">Card / NetBanking</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Visa / MC / RuPay</div>
+                <div className="text-xs font-bold font-mono text-[#0F172A] flex items-center justify-between">
+                  <span>Card / NetBanking</span>
+                  {paymentMethod === 'CREDIT_CARD' && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 shadow-xs shadow-emerald-500" />
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 font-sans ${paymentMethod === 'CREDIT_CARD' ? 'text-emerald-800 font-medium' : 'text-[#64748B]'}`}>
+                  Visa / MC / RuPay
+                </div>
               </button>
 
               <button
                 type="button"
                 disabled={isProcessing}
                 onClick={() => setPaymentMethod('COD')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                   paymentMethod === 'COD'
-                    ? 'border-cyan-400 bg-cyan-950/40 text-white shadow-md shadow-cyan-950/40'
-                    : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
+                    ? 'border-cyan-600 bg-cyan-50/80 text-[#0F172A] shadow-sm ring-2 ring-cyan-600/20'
+                    : 'border-[#E2E8F0] bg-white text-[#334155] hover:border-slate-300 hover:bg-[#F8FAFC]'
                 }`}
               >
-                <div className="text-xs font-bold font-mono">Cash on Delivery</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Pay on delivery</div>
+                <div className="text-xs font-bold font-mono text-[#0F172A] flex items-center justify-between">
+                  <span>Cash on Delivery</span>
+                  {paymentMethod === 'COD' && (
+                    <span className="w-2 h-2 rounded-full bg-cyan-600 shadow-xs shadow-cyan-500" />
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 font-sans ${paymentMethod === 'COD' ? 'text-cyan-800 font-medium' : 'text-[#64748B]'}`}>
+                  Pay on delivery
+                </div>
               </button>
             </div>
           </div>
 
           {/* Trust & Security Badges */}
-          <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 font-mono">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>256-Bit SSL · RBI Compliant Checkout</span>
+          <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between text-xs text-[#334155] font-mono shadow-xs">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-semibold text-[#0F172A]">256-Bit SSL · RBI Compliant Checkout</span>
             </div>
-            <div className="text-slate-500">Official Razorpay Integration</div>
+            <div className="text-[#64748B] font-medium">Official Razorpay Integration</div>
           </div>
 
           {/* Action Row */}
-          <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs text-slate-400 font-mono">
-              Estimated delivery: {product.deliveryDays} business days
+          <div className="pt-4 border-t border-[#E2E8F0] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-xs text-[#475569] font-mono font-medium">
+              Estimated delivery: <span className="text-emerald-700 font-bold">{product.deliveryDays || 3} business days</span>
             </div>
 
             <button
               type="submit"
               disabled={isProcessing}
-              className="w-full sm:w-auto px-7 py-3 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer transition-transform transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+              className="w-full sm:w-auto px-7 py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer transition-transform transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
             >
               {isProcessing ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
                   <span>{processingStatus || 'Contacting Gateway...'}</span>
                 </>
               ) : (
@@ -593,3 +620,4 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     </div>
   );
 };
+

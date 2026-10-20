@@ -141,11 +141,11 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-3xl border border-cyan-500/30 bg-gradient-to-b from-[#0E1524] via-[#0A0F1A] to-[#070A10] p-6 shadow-2xl shadow-cyan-950/60 text-center">
+      <div className="relative w-full max-w-lg rounded-3xl border border-cyan-500/50 bg-gradient-to-b from-[#111D33] via-[#0D1728] to-[#0A111E] p-6 shadow-2xl shadow-cyan-950/70 text-center">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-2 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
@@ -165,7 +165,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
             ? 'Transcribing with gemini-3.5-transcribe...'
             : 'Speak Your Shopping & Negotiation Goal'}
         </h3>
-        <p className="text-xs text-slate-400 mb-5">
+        <p className="text-xs text-slate-300 mb-5 font-normal">
           Record audio with your microphone and our server-side Gemini 3.5 Transcribe model will convert it into an AI shopping search.
         </p>
 
@@ -178,7 +178,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
               disabled={isTranscribing}
               className="px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/30 cursor-pointer hover:scale-105 transition-transform"
             >
-              <Mic className="w-4 h-4" />
+              <Mic className="w-4 h-4 text-slate-950" />
               <span>Start Microphone Recording</span>
             </button>
           ) : (
@@ -194,7 +194,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         </div>
 
         {/* Dynamic Waveform Visualizer */}
-        <div className="py-5 flex items-center justify-center gap-2 h-20 mb-5 px-4 bg-slate-950/60 rounded-2xl border border-slate-800">
+        <div className="py-5 flex items-center justify-center gap-2 h-20 mb-5 px-4 bg-[#080E1A] rounded-2xl border border-slate-700 shadow-inner">
           {waveformBars.map((height, idx) => (
             <div
               key={idx}
@@ -211,14 +211,14 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         )}
 
         {/* Live Transcript Box */}
-        <div className="mb-5 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 min-h-[54px] flex items-center justify-center">
+        <div className="mb-5 p-3.5 rounded-xl bg-[#0C1527] border border-slate-700 min-h-[54px] flex items-center justify-center shadow-xs">
           {isTranscribing ? (
-            <div className="flex items-center gap-2 text-cyan-300 text-xs font-mono">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <div className="flex items-center gap-2 text-cyan-300 text-xs font-mono font-medium">
+              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
               <span>Transcribing audio via gemini-3.5-transcribe...</span>
             </div>
           ) : (
-            <p className="text-sm font-medium text-slate-200 italic">
+            <p className="text-sm font-medium text-slate-100 italic">
               {transcript
                 ? `"${transcript}"`
                 : 'Click "Start Microphone Recording" above or choose a quick voice command below.'}
@@ -228,7 +228,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 
         {/* Preset Voice Prompts */}
         <div className="text-left mb-5">
-          <div className="text-[10px] uppercase font-mono text-slate-400 mb-2">
+          <div className="text-[10px] uppercase font-mono text-slate-300 font-bold tracking-wider mb-2">
             Quick Voice Instructions:
           </div>
           <div className="space-y-1.5">
@@ -236,10 +236,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
               <button
                 key={idx}
                 onClick={() => handleExecute(preset)}
-                className="w-full text-left px-3 py-2 rounded-lg bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-cyan-300 transition-colors flex items-center justify-between group cursor-pointer"
+                className="w-full text-left px-3 py-2.5 rounded-xl bg-[#131F36] hover:bg-[#1A2A46] border border-slate-700 hover:border-cyan-400 text-xs text-slate-200 hover:text-cyan-200 font-medium transition-colors flex items-center justify-between group cursor-pointer"
               >
                 <span className="truncate">{preset}</span>
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400 opacity-60 group-hover:opacity-100 shrink-0 ml-2" />
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400 opacity-70 group-hover:opacity-100 shrink-0 ml-2" />
               </button>
             ))}
           </div>

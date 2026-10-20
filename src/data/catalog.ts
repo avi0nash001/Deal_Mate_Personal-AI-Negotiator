@@ -11,15 +11,15 @@ import {
   CollectiveDealPool,
 } from '../types';
 
-import earbudsImg from '../assets/images/dealmate_earbuds_1790325700521.jpg';
-import smartwatchImg from '../assets/images/dealmate_smartwatch_1790325712403.jpg';
-import headphonesImg from '../assets/images/dealmate_headphones_1790325722911.jpg';
-import keyboardImg from '../assets/images/dealmate_keyboard_1790325734338.jpg';
+const earbudsImg = '/src/assets/images/dealmate_earbuds_1790325700521.jpg';
+const smartwatchImg = '/src/assets/images/dealmate_smartwatch_1790325712403.jpg';
+const headphonesImg = '/src/assets/images/dealmate_headphones_1790325722911.jpg';
+const keyboardImg = '/src/assets/images/dealmate_keyboard_1790325734338.jpg';
 
-import shirtImg from '../assets/images/smartbuy_casual_shirt_1790326407453.jpg';
-import sneakersImg from '../assets/images/smartbuy_sneakers_1790326421188.jpg';
-import dressImg from '../assets/images/smartbuy_dress_1790326431836.jpg';
-import groceryImg from '../assets/images/smartbuy_grocery_1790326442369.jpg';
+const shirtImg = '/src/assets/images/smartbuy_casual_shirt_1790326407453.jpg';
+const sneakersImg = '/src/assets/images/smartbuy_sneakers_1790326421188.jpg';
+const dressImg = '/src/assets/images/smartbuy_dress_1790326431836.jpg';
+const groceryImg = '/src/assets/images/smartbuy_grocery_1790326442369.jpg';
 
 export const SELLERS: Seller[] = [
   {

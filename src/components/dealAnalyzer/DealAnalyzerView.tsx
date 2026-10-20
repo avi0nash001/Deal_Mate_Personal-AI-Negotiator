@@ -982,7 +982,7 @@ export const DealAnalyzerView: React.FC<DealAnalyzerViewProps> = ({
             <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-500" />
-                <h3 className="text-base font-bold">Source Transparency Registry</h3>
+                <h3 className="text-base font-bold" style={{ color: 'var(--heading-primary)' }}>Source Transparency Registry</h3>
               </div>
               <button
                 type="button"
