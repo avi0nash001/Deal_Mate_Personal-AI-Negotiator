@@ -887,10 +887,15 @@ export default function App() {
     const isSampleNikonQuery = /nikon\s*z50/i.test(targetQuery);
     console.group(`%c[DealMate Search Pipeline] 🔍 Live Search Execution: "${targetQuery}"${isSampleNikonQuery ? ' 🎯 [Sample Benchmark: Nikon Z50 II camera]' : ''}`, 'color: #2563EB; font-weight: bold; font-size: 13px;');
     
-    const searchPayload = {
+    const searchPayload: {
+      query: string;
+      budget?: number;
+      category?: string;
+      forceFresh: boolean;
+      timestamp: string;
+    } = {
       query: targetQuery,
-      budget: session?.userBudget?.maxBudget || 120000,
-      category: 'Electronics',
+      budget: session?.userBudget?.maxBudget && session.userBudget.maxBudget > 0 ? session.userBudget.maxBudget : undefined,
       forceFresh: true,
       timestamp: new Date().toISOString(),
     };
@@ -899,8 +904,8 @@ export default function App() {
       endpoint: '/api/products/search',
       method: 'POST',
       queryParameter: targetQuery,
-      budgetParameter: searchPayload.budget,
-      categoryParameter: searchPayload.category,
+      budgetParameter: searchPayload.budget || 'auto-infer',
+      categoryParameter: searchPayload.category || 'auto-infer',
       forceFresh: searchPayload.forceFresh,
       fullPayload: searchPayload,
     });

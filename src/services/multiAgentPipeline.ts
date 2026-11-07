@@ -653,6 +653,12 @@ export class PreferenceAgent {
         (lower.includes('laptop') && !previous.productType.toLowerCase().includes('laptop')) ||
         ((lower.includes('camera') || lower.includes('nikon') || lower.includes('z50') || lower.includes('canon') || lower.includes('dslr')) && !previous.productType.toLowerCase().includes('camera')) ||
         ((lower.includes('phone') || lower.includes('galaxy') || lower.includes('s25') || lower.includes('iphone') || lower.includes('pixel')) && !previous.productType.toLowerCase().includes('smartphone')) ||
+        ((lower.includes('chair') || lower.includes('desk') || lower.includes('sofa') || lower.includes('table')) && previous.category !== 'Furniture & Living') ||
+        ((lower.includes('air fryer') || lower.includes('microwave') || lower.includes('refrigerator') || lower.includes('vacuum')) && previous.category !== 'Home & Kitchen') ||
+        ((lower.includes('sunscreen') || lower.includes('serum') || lower.includes('perfume') || lower.includes('shampoo')) && previous.category !== 'Beauty & Personal Care') ||
+        ((lower.includes('yoga') || lower.includes('dumbbell') || lower.includes('cricket') || lower.includes('gym')) && previous.category !== 'Sports & Fitness') ||
+        ((lower.includes('ps5') || lower.includes('xbox') || lower.includes('lego') || lower.includes('gamepad')) && previous.category !== 'Toys & Gaming') ||
+        ((lower.includes('book') || lower.includes('novel')) && previous.category !== 'Books & Stationery') ||
         (lower.includes('shirt') && previous.category !== 'Fashion') ||
         (lower.includes('keyboard') && !previous.productType.toLowerCase().includes('keyboard')) ||
         (lower.includes('watch') && !previous.productType.toLowerCase().includes('watch')) ||
@@ -746,9 +752,100 @@ export class PreferenceAgent {
     } else if (lower.includes('headphone') || lower.includes('over-ear') || lower.includes('wh-')) {
       category = 'Electronics';
       productType = 'Noise-cancelling headphones';
-    } else if (lower.includes('smartwatch') || lower.includes('watch') || lower.includes('fitness band')) {
+    } else if (
+      lower.includes('smartwatch') ||
+      lower.includes('fitness tracker') ||
+      lower.includes('fitness band') ||
+      lower.includes('smart band')
+    ) {
       category = 'Electronics';
       productType = 'Fitness smartwatch';
+    } else if (
+      lower.includes('chair') ||
+      lower.includes('desk') ||
+      lower.includes('sofa') ||
+      lower.includes('table') ||
+      lower.includes('bed') ||
+      lower.includes('mattress') ||
+      lower.includes('wardrobe') ||
+      lower.includes('furniture')
+    ) {
+      category = 'Furniture & Living';
+      productType = lower.includes('chair') ? 'Ergonomic Office Chair' : 'Home Furniture';
+    } else if (
+      lower.includes('air fryer') ||
+      lower.includes('microwave') ||
+      lower.includes('refrigerator') ||
+      lower.includes('fridge') ||
+      lower.includes('vacuum') ||
+      lower.includes('blender') ||
+      lower.includes('mixer') ||
+      lower.includes('cookware') ||
+      lower.includes('induction') ||
+      lower.includes('chimney') ||
+      lower.includes('purifier')
+    ) {
+      category = 'Home & Kitchen';
+      productType = lower.includes('air fryer') ? 'Air Fryer' : 'Kitchen Appliance';
+    } else if (
+      lower.includes('sunscreen') ||
+      lower.includes('serum') ||
+      lower.includes('moisturizer') ||
+      lower.includes('perfume') ||
+      lower.includes('fragrance') ||
+      lower.includes('deodorant') ||
+      lower.includes('trimmer') ||
+      lower.includes('shaver') ||
+      lower.includes('hair dryer') ||
+      lower.includes('shampoo') ||
+      lower.includes('skincare')
+    ) {
+      category = 'Beauty & Personal Care';
+      productType = lower.includes('sunscreen') ? 'Sunscreen & Skincare' : 'Personal Care & Grooming';
+    } else if (
+      lower.includes('yoga mat') ||
+      lower.includes('dumbbell') ||
+      lower.includes('treadmill') ||
+      lower.includes('cycle') ||
+      lower.includes('gym') ||
+      lower.includes('cricket') ||
+      lower.includes('badminton') ||
+      lower.includes('fitness')
+    ) {
+      category = 'Sports & Fitness';
+      productType = lower.includes('yoga') ? 'Yoga Mat & Fitness Gear' : 'Sports & Fitness Equipment';
+    } else if (
+      lower.includes('ps5') ||
+      lower.includes('playstation') ||
+      lower.includes('xbox') ||
+      lower.includes('nintendo') ||
+      lower.includes('controller') ||
+      lower.includes('board game') ||
+      lower.includes('lego') ||
+      lower.includes('toy')
+    ) {
+      category = 'Toys & Gaming';
+      productType = lower.includes('ps5') || lower.includes('xbox') ? 'Gaming Console' : 'Toys & Gaming';
+    } else if (
+      lower.includes('analog watch') ||
+      lower.includes('chronograph') ||
+      lower.includes('sunglasses') ||
+      lower.includes('wallet') ||
+      lower.includes('belt') ||
+      lower.includes('backpack') ||
+      lower.includes('watch')
+    ) {
+      category = 'Watches & Accessories';
+      productType = lower.includes('watch') ? 'Wristwatch' : 'Fashion Accessory';
+    } else if (
+      lower.includes('book') ||
+      lower.includes('novel') ||
+      lower.includes('stationery') ||
+      lower.includes('pen') ||
+      lower.includes('notebook')
+    ) {
+      category = 'Books & Stationery';
+      productType = 'Books & Publications';
     } else if (lower.includes('keyboard') || lower.includes('mouse') || lower.includes('mechanical') || lower.includes('g102')) {
       category = 'Electronics';
       productType = 'Computer Accessories';
@@ -761,9 +858,17 @@ export class PreferenceAgent {
     ) {
       category = 'Footwear';
       productType = lower.includes('running') ? 'Running shoes' : 'Casual sneakers';
-    } else if (lower.includes('shirt') || lower.includes('t-shirt') || lower.includes('apparel') || lower.includes('fashion')) {
+    } else if (
+      lower.includes('shirt') ||
+      lower.includes('t-shirt') ||
+      lower.includes('apparel') ||
+      lower.includes('fashion') ||
+      lower.includes('hoodie') ||
+      lower.includes('jeans') ||
+      lower.includes('kurta')
+    ) {
       category = 'Fashion';
-      productType = 'Casual cotton shirt';
+      productType = 'Apparel & Clothing';
     } else if (lower.includes('dress') || lower.includes('gown') || lower.includes('party wear')) {
       category = 'Fashion';
       productType = 'Celebration / evening dress';
@@ -771,8 +876,8 @@ export class PreferenceAgent {
       category = 'Grocery';
       productType = 'Organic pantry & home essentials';
     } else if (!previous || isCategoryShift) {
-      category = 'Electronics';
-      productType = 'Smart electronics & gadgets';
+      category = 'Retail Products';
+      productType = 'Consumer products';
     }
 
     // Extract preferred brands

@@ -820,6 +820,9 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
       activeNegotiation: null,
       alternativeCandidates: alts,
     });
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setMobileActiveTab('products');
+    }
   };
 
   const handleStartNegotiate = (candidate: DealHunterProductCandidate) => {
@@ -2219,7 +2222,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
       </div>
 
       {/* TWO-PANE WORKSPACE (Requirement #1, #2, #3, #6, #8) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-140px)] min-h-[660px] items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[500px] lg:h-[calc(100vh-140px)] lg:min-h-[660px] items-stretch">
         {/* Left Pane: Conversation & AI Shopping Assistant */}
         <section
           className={`col-span-1 lg:col-span-7 flex flex-col rounded-3xl border overflow-hidden transition-all h-full ${
@@ -2520,7 +2523,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
             </div>
           ) : (
             /* 2. ACTIVE CONVERSATIONAL STREAM */
-            <div className="flex flex-col h-full min-h-[580px]">
+            <div className="flex flex-col h-full min-h-[420px] lg:min-h-[580px]">
               <div className="flex-1 p-4 sm:p-6 space-y-5 overflow-y-auto max-h-[740px]">
                 {conversationHistory.map((msg) => (
                   <div key={msg.id} className="space-y-3">
@@ -4092,6 +4095,7 @@ export const StreamlinedNegotiator: React.FC<StreamlinedNegotiatorProps> = ({
                 height={160}
                 showTimeRangeSelector={false}
                 initialDays={30}
+                isLight={theme.isLight}
               />
             </div>
 

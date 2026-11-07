@@ -261,6 +261,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
 
   return (
     <div className="md:hidden">
+      {/* Hamburger Toggle Button */}
       <button
         type="button"
         onClick={() => {
@@ -271,329 +272,439 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
         aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
         aria-expanded={isOpen}
         aria-controls="dealmate-mobile-drawer"
-        className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+        className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 shrink-0 ${
           currentTheme.isLight
-            ? 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
-            : 'bg-[#161B20] hover:bg-[#1E242B] border-[#293139] text-slate-100'
+            ? 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800 shadow-2xs'
+            : 'bg-[#161B20] hover:bg-[#1E242B] border-[#293139] text-slate-100 shadow-2xs'
         }`}
       >
         {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
 
+      {/* Slide-out Mobile Navigation Drawer & Backdrop */}
       {isOpen && (
         <div
           id="dealmate-mobile-drawer"
           role="dialog"
           aria-modal="true"
           aria-label="Mobile Navigation Menu"
-          className="fixed inset-x-0 top-16 bottom-0 z-50 flex flex-col"
+          className="fixed inset-0 z-50 overflow-hidden pointer-events-auto"
         >
-          {/* Backdrop */}
+          {/* Dimmed & Blurred Backdrop Overlay */}
           <div
-            onClick={() => setIsOpen(false)}
-            className="fixed inset-0 top-16 bg-slate-950/60 backdrop-blur-xs"
+            onClick={() => {
+              soundEffects.playBlip();
+              setIsOpen(false);
+            }}
+            aria-hidden="true"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
           />
 
-          {/* Full-width vertical drawer */}
+          {/* Sliding Drawer Panel from Right */}
           <div
-            className={`relative z-10 w-full max-h-[calc(100vh-4rem)] overflow-y-auto border-b px-4 py-5 space-y-6 shadow-2xl ${
+            className={`fixed inset-y-0 right-0 w-full max-w-sm sm:max-w-md h-[100dvh] shadow-2xl flex flex-col z-10 transform transition-transform duration-300 ease-out translate-x-0 ${
               currentTheme.isLight
-                ? 'bg-white border-slate-200 text-slate-900'
-                : 'bg-[#12161B] border-[#293139] text-slate-100'
+                ? 'bg-white border-l border-slate-200 text-slate-900'
+                : 'bg-[#12161B] border-l border-[#293139] text-slate-100'
             }`}
           >
-            {/* SECTION 1: MAIN */}
-            <div>
-              <div className="px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Main
-              </div>
-              <div className="space-y-1">
-                {mainItems.map((item) => {
-                  const isActive = currentTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleNav(item.id)}
-                      className={`w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                        isActive
-                          ? currentTheme.isLight
-                            ? 'bg-blue-50 text-blue-700 font-semibold'
-                            : 'bg-blue-950/50 text-blue-300 font-semibold'
-                          : currentTheme.isLight
-                          ? 'hover:bg-slate-100 text-slate-800'
-                          : 'hover:bg-white/5 text-slate-200'
-                      }`}
-                    >
-                      <span className="flex items-center gap-3">
-                        {item.icon}
-                        <span>{item.label}</span>
-                      </span>
-                      {item.badge !== undefined && item.badge > 0 && (
-                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-500">
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* SECTION 2: QUICK ACCESS */}
+            {/* 1. STICKY DRAWER HEADER */}
             <div
-              className={`pt-4 border-t ${
-                currentTheme.isLight ? 'border-slate-100' : 'border-[#242C35]'
+              className={`shrink-0 h-16 px-4 flex items-center justify-between border-b ${
+                currentTheme.isLight
+                  ? 'bg-white/95 border-slate-200 backdrop-blur-md'
+                  : 'bg-[#12161B]/95 border-[#293139] backdrop-blur-md'
               }`}
             >
-              <div className="px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Quick Access
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                {quickAccessItems.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => {
-                      soundEffects.playBlip();
-                      item.action();
-                    }}
-                    className={`w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                      currentTheme.isLight
-                        ? 'hover:bg-slate-100 text-slate-700'
-                        : 'hover:bg-white/5 text-slate-200'
-                    }`}
-                  >
-                    <span className="flex items-center gap-3">
-                      {item.icon}
-                      <span>{item.label}</span>
-                    </span>
-                    {item.subtitle && (
-                      <span className="text-[11px] font-mono text-slate-400">
-                        {item.subtitle}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* SECTION 3: SETTINGS */}
-            <div
-              className={`pt-4 border-t space-y-3 ${
-                currentTheme.isLight ? 'border-slate-100' : 'border-[#242C35]'
-              }`}
-            >
-              <div className="px-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Settings
-              </div>
-
-              {/* Theme segmented selector */}
-              <div className="px-2">
-                <div className="text-xs font-medium mb-2 text-slate-500">
-                  Theme
-                </div>
+              <div className="flex items-center gap-2.5">
                 <div
-                  className={`grid grid-cols-3 gap-1.5 p-1 rounded-xl border ${
-                    currentTheme.isLight
-                      ? 'bg-slate-50 border-slate-200'
-                      : 'bg-[#181D23] border-[#293139]'
-                  }`}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shadow-xs"
+                  style={{
+                    background: `linear-gradient(135deg, ${currentTheme.primaryAccentHex}, ${currentTheme.secondaryAccentHex})`,
+                  }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEffects.playBlip();
-                      onSelectTheme('pure-white');
-                    }}
-                    className={`min-h-[38px] rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                      currentThemeId === 'pure-white'
-                        ? 'bg-white text-blue-600 shadow-xs font-semibold'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Sun className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Light</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEffects.playBlip();
-                      onSelectTheme('warm-graphite');
-                    }}
-                    className={`min-h-[38px] rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                      currentThemeId === 'warm-graphite'
-                        ? 'bg-[#242B33] text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Moon className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Dark</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEffects.playBlip();
-                      const prefersDark =
-                        typeof window !== 'undefined' &&
-                        window.matchMedia &&
-                        window.matchMedia('(prefers-color-scheme: dark)').matches;
-                      onSelectTheme(prefersDark ? 'warm-graphite' : 'pure-white');
-                    }}
-                    className="min-h-[38px] rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 text-slate-400 hover:text-blue-500 transition-colors cursor-pointer"
-                  >
-                    <Monitor className="w-3.5 h-3.5" />
-                    <span>System</span>
-                  </button>
+                  <Zap className="w-4 h-4 text-white fill-current" />
+                </div>
+                <div>
+                  <div className="font-display font-extrabold text-base tracking-tight leading-none">
+                    DealMate <span className="text-blue-500 font-mono text-xs">AI</span>
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                    {role === 'store_owner'
+                      ? 'Shop Owner Console'
+                      : role === 'admin'
+                      ? 'Platform Admin'
+                      : 'AI Shopping Negotiator'}
+                  </div>
                 </div>
               </div>
 
-              {/* Notifications & Saved Items */}
+              {/* Explicit High-Touch Close Button (min 44x44px) */}
               <button
                 type="button"
                 onClick={() => {
                   soundEffects.playBlip();
-                  onOpenAccount();
                   setIsOpen(false);
                 }}
-                className={`w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                aria-label="Close navigation drawer"
+                title="Close navigation"
+                className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                   currentTheme.isLight
-                    ? 'hover:bg-slate-100 text-slate-700'
-                    : 'hover:bg-white/5 text-slate-200'
+                    ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                    : 'bg-[#1A2027] hover:bg-[#252D37] border-[#293139] text-slate-200'
                 }`}
               >
-                <span className="flex items-center gap-3">
-                  <Bell className="w-4 h-4 text-blue-500" />
-                  <span>Notifications & Saved Deals</span>
-                </span>
-                {savedCount > 0 && (
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-500">
-                    {savedCount}
-                  </span>
-                )}
+                <X className="w-5 h-5" />
               </button>
+            </div>
 
-              {comparedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEffects.playBlip();
-                    onOpenCompare();
-                    setIsOpen(false);
-                  }}
-                  className={`w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                    currentTheme.isLight
-                      ? 'hover:bg-slate-100 text-slate-700'
-                      : 'hover:bg-white/5 text-slate-200'
-                  }`}
-                >
-                  <span className="flex items-center gap-3">
-                    <Layers className="w-4 h-4 text-cyan-500" />
-                    <span>Compare Selected Products</span>
-                  </span>
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-500">
-                    {comparedCount}
-                  </span>
-                </button>
-              )}
-
-              {/* Sound toggle */}
-              <button
-                type="button"
-                onClick={toggleSound}
-                className={`w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  currentTheme.isLight
-                    ? 'hover:bg-slate-100 text-slate-700'
-                    : 'hover:bg-white/5 text-slate-200'
-                }`}
-              >
-                <span className="flex items-center gap-3">
-                  {soundEnabled ? (
-                    <Volume2 className="w-4 h-4 text-blue-500" />
-                  ) : (
-                    <VolumeX className="w-4 h-4 text-slate-400" />
-                  )}
-                  <span>Interface Audio</span>
-                </span>
-                <span className="text-xs font-mono text-slate-400">
-                  {soundEnabled ? 'Enabled' : 'Muted'}
-                </span>
-              </button>
-
-              {/* Profile / Auth actions */}
-              {!currentUser ? (
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEffects.playBlip();
-                      onOpenAuthModal?.('/auth');
-                      setIsOpen(false);
-                    }}
-                    className={`min-h-[42px] rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer ${
-                      currentTheme.isLight
-                        ? 'bg-white border-slate-200 text-slate-800'
-                        : 'bg-[#181D23] border-[#293139] text-slate-100'
-                    }`}
-                  >
-                    <User className="w-4 h-4 text-blue-500" />
-                    <span>Sign In</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEffects.playBlip();
-                      onOpenAuthModal?.('/auth/signup');
-                      setIsOpen(false);
-                    }}
-                    className="min-h-[42px] rounded-xl bg-blue-600 text-white text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>Create Account</span>
-                  </button>
+            {/* 2. INDEPENDENT TOUCH-SCROLLABLE BODY */}
+            <div
+              className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 space-y-6"
+              style={{
+                WebkitOverflowScrolling: 'touch',
+                paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 32px)',
+              }}
+            >
+              {/* SECTION 1: MAIN NAVIGATION */}
+              <div>
+                <div className="px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Main Navigation
                 </div>
-              ) : (
-                <div className="space-y-1.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEffects.playBlip();
-                      onOpenAccount('settings');
-                      setIsOpen(false);
-                    }}
-                    className={`w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                <div className="space-y-1.5">
+                  {mainItems.map((item) => {
+                    const isActive = currentTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleNav(item.id)}
+                        className={`w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                          isActive
+                            ? currentTheme.isLight
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs'
+                              : 'bg-blue-950/60 text-blue-300 border border-blue-800/80 shadow-2xs'
+                            : currentTheme.isLight
+                            ? 'hover:bg-slate-100 text-slate-800 border border-transparent'
+                            : 'hover:bg-white/5 text-slate-200 border border-transparent'
+                        }`}
+                      >
+                        <span className="flex items-center gap-3">
+                          {item.icon}
+                          <span>{item.label}</span>
+                        </span>
+                        {item.badge !== undefined && item.badge > 0 && (
+                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SECTION 2: QUICK ACCESS & SHORTCUTS */}
+              <div
+                className={`pt-4 border-t ${
+                  currentTheme.isLight ? 'border-slate-100' : 'border-[#242C35]'
+                }`}
+              >
+                <div className="px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Quick Access
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {quickAccessItems.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        soundEffects.playBlip();
+                        item.action();
+                      }}
+                      className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                        currentTheme.isLight
+                          ? 'hover:bg-slate-100 text-slate-700'
+                          : 'hover:bg-white/5 text-slate-200'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5 truncate">
+                        {item.icon}
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      {item.subtitle && (
+                        <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
+                          {item.subtitle}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* SECTION 3: INTERFACE & PREFERENCES */}
+              <div
+                className={`pt-4 border-t space-y-3.5 ${
+                  currentTheme.isLight ? 'border-slate-100' : 'border-[#242C35]'
+                }`}
+              >
+                <div className="px-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Interface & Theme
+                </div>
+
+                {/* Theme segmented selector */}
+                <div className="px-1">
+                  <div
+                    className={`grid grid-cols-3 gap-1.5 p-1 rounded-xl border ${
                       currentTheme.isLight
-                        ? 'hover:bg-slate-100 text-slate-700'
-                        : 'hover:bg-white/5 text-slate-200'
+                        ? 'bg-slate-100/80 border-slate-200'
+                        : 'bg-[#181D23] border-[#293139]'
                     }`}
                   >
-                    <span className="flex items-center gap-3">
-                      <User className="w-4 h-4 text-blue-500" />
-                      <span>
-                        {currentUser.displayName} (
-                        {currentUser.role === 'store_owner'
-                          ? 'SHOP OWNER'
-                          : currentUser.role.toUpperCase()}
-                        )
-                      </span>
-                    </span>
-                    <span className="text-xs font-mono text-blue-500">Settings</span>
-                  </button>
-                  {onSignOut && (
                     <button
                       type="button"
                       onClick={() => {
                         soundEffects.playBlip();
-                        onSignOut();
-                        setIsOpen(false);
+                        onSelectTheme('pure-white');
                       }}
-                      className="w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      className={`min-h-[42px] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        currentThemeId === 'pure-white'
+                          ? 'bg-white text-blue-600 shadow-sm border border-slate-200'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
                     >
-                      <LogOut className="w-4 h-4" />
-                      <span>Sign Out</span>
+                      <Sun className="w-4 h-4 text-amber-500" />
+                      <span>Light</span>
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEffects.playBlip();
+                        onSelectTheme('warm-graphite');
+                      }}
+                      className={`min-h-[42px] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        currentThemeId === 'warm-graphite'
+                          ? 'bg-[#242B33] text-white shadow-sm border border-[#333D48]'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Moon className="w-4 h-4 text-blue-400" />
+                      <span>Dark</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEffects.playBlip();
+                        const prefersDark =
+                          typeof window !== 'undefined' &&
+                          window.matchMedia &&
+                          window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        onSelectTheme(prefersDark ? 'warm-graphite' : 'pure-white');
+                      }}
+                      className="min-h-[42px] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-blue-500 transition-colors cursor-pointer"
+                    >
+                      <Monitor className="w-4 h-4" />
+                      <span>System</span>
+                    </button>
+                  </div>
                 </div>
-              )}
+
+                {/* Notifications & Saved Deals */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playBlip();
+                    onOpenAccount('saved_products');
+                    setIsOpen(false);
+                  }}
+                  className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                    currentTheme.isLight
+                      ? 'hover:bg-slate-100 text-slate-800'
+                      : 'hover:bg-white/5 text-slate-200'
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Bell className="w-4 h-4 text-blue-500" />
+                    <span>Notifications & Saved Deals</span>
+                  </span>
+                  {savedCount > 0 && (
+                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                      {savedCount}
+                    </span>
+                  )}
+                </button>
+
+                {comparedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEffects.playBlip();
+                      onOpenCompare();
+                      setIsOpen(false);
+                    }}
+                    className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                      currentTheme.isLight
+                        ? 'hover:bg-slate-100 text-slate-800'
+                        : 'hover:bg-white/5 text-slate-200'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Layers className="w-4 h-4 text-cyan-500" />
+                      <span>Compare Selected Products</span>
+                    </span>
+                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-400">
+                      {comparedCount}
+                    </span>
+                  </button>
+                )}
+
+                {/* Interface Sound Toggle */}
+                <button
+                  type="button"
+                  onClick={toggleSound}
+                  className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                    currentTheme.isLight
+                      ? 'hover:bg-slate-100 text-slate-800'
+                      : 'hover:bg-white/5 text-slate-200'
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    {soundEnabled ? (
+                      <Volume2 className="w-4 h-4 text-blue-500" />
+                    ) : (
+                      <VolumeX className="w-4 h-4 text-slate-400" />
+                    )}
+                    <span>Interface Audio Effects</span>
+                  </span>
+                  <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                    {soundEnabled ? 'Enabled' : 'Muted'}
+                  </span>
+                </button>
+              </div>
+
+              {/* SECTION 4: USER ACCOUNT & AUTHENTICATION */}
+              <div
+                className={`pt-4 border-t ${
+                  currentTheme.isLight ? 'border-slate-100' : 'border-[#242C35]'
+                }`}
+              >
+                {!currentUser ? (
+                  <div className="space-y-2">
+                    <div className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Account Access
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEffects.playBlip();
+                          onOpenAuthModal?.('/auth');
+                          setIsOpen(false);
+                        }}
+                        className={`min-h-[44px] rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                          currentTheme.isLight
+                            ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-800'
+                            : 'bg-[#181D23] hover:bg-[#20262E] border-[#293139] text-slate-100'
+                        }`}
+                      >
+                        <User className="w-4 h-4 text-blue-500" />
+                        <span>Sign In</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEffects.playBlip();
+                          onOpenAuthModal?.('/auth/signup');
+                          setIsOpen(false);
+                        }}
+                        className="min-h-[44px] rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-colors"
+                      >
+                        <span>Create Account</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Signed in as
+                    </div>
+                    <div
+                      className={`p-3 rounded-2xl border flex items-center justify-between ${
+                        currentTheme.isLight
+                          ? 'bg-slate-50 border-slate-200'
+                          : 'bg-[#161B21] border-[#293139]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          {currentUser.displayName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="truncate">
+                          <div className="text-xs font-bold truncate">
+                            {currentUser.displayName}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                            {currentUser.email}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 uppercase shrink-0">
+                        {currentUser.role === 'store_owner' ? 'Shop Owner' : currentUser.role}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEffects.playBlip();
+                          onOpenAccount('profile');
+                          setIsOpen(false);
+                        }}
+                        className={`min-h-[44px] rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer ${
+                          currentTheme.isLight
+                            ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-800'
+                            : 'bg-[#181D23] hover:bg-[#20262E] border-[#293139] text-slate-100'
+                        }`}
+                      >
+                        <User className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Settings</span>
+                      </button>
+                      {onSignOut && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundEffects.playBlip();
+                            onSignOut();
+                            setIsOpen(false);
+                          }}
+                          className="min-h-[44px] rounded-xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          <span>Sign Out</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 3. STICKY DRAWER FOOTER */}
+            <div
+              className={`shrink-0 px-4 py-3 border-t flex items-center justify-between text-xs ${
+                currentTheme.isLight
+                  ? 'bg-slate-50/90 border-slate-200 text-slate-600'
+                  : 'bg-[#0E1217]/90 border-[#242C35] text-slate-400'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Verified AI Negotiator</span>
+              </div>
+              <div className="font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                ₹{totalPlatformSavings.toLocaleString('en-IN')} Saved
+              </div>
             </div>
           </div>
         </div>

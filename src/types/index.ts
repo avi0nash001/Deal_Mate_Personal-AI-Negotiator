@@ -65,6 +65,7 @@ export interface Product {
   isFallbackData?: boolean;
   isCached?: boolean;
   dataSource?: string;
+  providerAttribution?: string;
   searchSourceTitle?: string;
   fetchedAt?: string;
   priceHistory?: Array<{ date: string; price: number }>;

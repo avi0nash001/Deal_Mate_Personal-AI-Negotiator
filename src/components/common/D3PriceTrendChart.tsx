@@ -117,6 +117,26 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
 
+  // Auto-resolve isLight from prop or active document/body theme
+  const resolvedIsLight = (() => {
+    if (typeof isLight === 'boolean' && isLight) return true;
+    if (typeof document !== 'undefined') {
+      const isDark =
+        document.documentElement.classList.contains('dark') ||
+        document.body.classList.contains('theme-warm-graphite') ||
+        document.body.classList.contains('theme-cyber-indigo') ||
+        document.body.classList.contains('theme-cosmic-nebula') ||
+        document.body.classList.contains('theme-emerald-matrix') ||
+        document.body.classList.contains('theme-titanium-stealth');
+      if (isDark) return false;
+      const themeAttr = document.body.className;
+      if (themeAttr.includes('theme-pure-white') || themeAttr.includes('theme-solar-gold')) {
+        return true;
+      }
+    }
+    return isLight;
+  })();
+
   const [daysRange, setDaysRange] = useState<number>(initialDays);
   const [hoveredData, setHoveredData] = useState<{
     dateStr: string;
@@ -190,26 +210,26 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
     if (currentPrice <= minPrice * 1.02) {
       verdict = 'STEAL';
       badgeText = '🏆 30-Day Floor (True Deal)';
-      badgeColor = isLight ? '#15803D' : '#34D399';
-      badgeBg = isLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.15)';
+      badgeColor = resolvedIsLight ? '#15803D' : '#34D399';
+      badgeBg = resolvedIsLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.15)';
       explainer = `Current market price is at the absolute lowest recorded level in 30 days (₹${minPrice.toLocaleString('en-IN')}). Optimal buying opportunity.`;
     } else if (diffFromAvgPct <= -4) {
       verdict = 'GREAT';
       badgeText = `🟢 Great Deal (${Math.abs(diffFromAvgPct)}% Below 30d Avg)`;
-      badgeColor = isLight ? '#166534' : '#34D399';
-      badgeBg = isLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.15)';
+      badgeColor = resolvedIsLight ? '#166534' : '#34D399';
+      badgeBg = resolvedIsLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.15)';
       explainer = `Trading ${Math.abs(diffFromAvgPct)}% lower than the 30-day average price of ₹${avgPrice.toLocaleString('en-IN')}. Good value.`;
     } else if (diffFromAvgPct <= 4) {
       verdict = 'FAIR';
       badgeText = '🟡 Fair Market Price';
-      badgeColor = isLight ? '#92400E' : '#FBBF24';
-      badgeBg = isLight ? '#FEF3C7' : 'rgba(245, 158, 11, 0.15)';
+      badgeColor = resolvedIsLight ? '#92400E' : '#FBBF24';
+      badgeBg = resolvedIsLight ? '#FEF3C7' : 'rgba(245, 158, 11, 0.15)';
       explainer = `Trading close to the 30-day baseline average of ₹${avgPrice.toLocaleString('en-IN')}. AI Negotiator can unlock extra savings.`;
     } else {
       verdict = 'HIGH';
       badgeText = `🔴 Above 30d Average (+${diffFromAvgPct}%)`;
-      badgeColor = isLight ? '#991B1B' : '#F87171';
-      badgeBg = isLight ? '#FEE2E2' : 'rgba(239, 68, 68, 0.15)';
+      badgeColor = resolvedIsLight ? '#991B1B' : '#F87171';
+      badgeBg = resolvedIsLight ? '#FEE2E2' : 'rgba(239, 68, 68, 0.15)';
       explainer = `Currently pricing ${diffFromAvgPct}% above the 30-day average. We recommend using DealMate to negotiate down toward ₹${minPrice.toLocaleString('en-IN')}.`;
     }
 
@@ -225,7 +245,7 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       diffFromAvgPct,
       positionInRange,
     };
-  }, [primarySeries, isLight]);
+  }, [primarySeries, resolvedIsLight]);
 
   // Render D3 chart inside SVG
   useEffect(() => {
@@ -287,8 +307,8 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       .attr('x2', width)
       .attr('y1', (d) => yScale(d))
       .attr('y2', (d) => yScale(d))
-      .attr('stroke', isLight ? '#E5E7EB' : '#334155')
-      .attr('stroke-opacity', isLight ? 0.8 : 0.25)
+      .attr('stroke', resolvedIsLight ? '#E5E7EB' : '#334155')
+      .attr('stroke-opacity', resolvedIsLight ? 0.8 : 0.25)
       .attr('stroke-dasharray', '3,3');
 
     // Y Axis
@@ -304,10 +324,10 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       .call((gAxis) =>
         gAxis
           .selectAll('.tick text')
-          .attr('fill', isLight ? '#4B5563' : '#94A3B8')
+          .attr('fill', resolvedIsLight ? '#4B5563' : '#94A3B8')
           .attr('dx', '-4')
       )
-      .call((gAxis) => gAxis.selectAll('.tick line').attr('stroke', isLight ? '#E5E7EB' : '#334155'));
+      .call((gAxis) => gAxis.selectAll('.tick line').attr('stroke', resolvedIsLight ? '#E5E7EB' : '#334155'));
 
     // X Axis
     const xAxis = d3
@@ -322,14 +342,14 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       .attr('class', 'x-axis text-[10px] font-mono')
       .attr('transform', `translate(0,${innerHeight})`)
       .call(xAxis)
-      .call((gAxis) => gAxis.select('.domain').attr('stroke', '#334155'))
+      .call((gAxis) => gAxis.select('.domain').attr('stroke', resolvedIsLight ? '#D1D5DB' : '#334155'))
       .call((gAxis) =>
         gAxis
           .selectAll('.tick text')
-          .attr('fill', '#94A3B8')
+          .attr('fill', resolvedIsLight ? '#4B5563' : '#94A3B8')
           .attr('dy', '10')
       )
-      .call((gAxis) => gAxis.selectAll('.tick line').attr('stroke', '#334155'));
+      .call((gAxis) => gAxis.selectAll('.tick line').attr('stroke', resolvedIsLight ? '#D1D5DB' : '#334155'));
 
     // Reference Target Price Line (if applicable)
     if (targetPrice && targetPrice >= yScale.domain()[0] && targetPrice <= yScale.domain()[1]) {
@@ -543,23 +563,23 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       ref={containerRef}
       className={`rounded-2xl border p-4 shadow-xl space-y-4 transition-all ${className}`}
       style={{
-        backgroundColor: isLight ? '#FFFFFF' : '#090D16',
-        borderColor: isLight ? '#D1D5DB' : '#1E293B',
-        color: isLight ? '#111827' : '#F8FAFC',
+        backgroundColor: resolvedIsLight ? '#FFFFFF' : '#090D16',
+        borderColor: resolvedIsLight ? '#D1D5DB' : '#1E293B',
+        color: resolvedIsLight ? '#111827' : '#F8FAFC',
       }}
     >
       {/* Header Bar with Time Range & Live Hover readout */}
       <div
         className="flex flex-wrap items-center justify-between gap-3 border-b pb-3"
-        style={{ borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
+        style={{ borderColor: resolvedIsLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
       >
         <div className="flex items-center gap-2">
           <div
             className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{
-              backgroundColor: isLight ? '#EFF6FF' : 'rgba(8, 47, 73, 0.8)',
-              border: `1px solid ${isLight ? '#BFDBFE' : 'rgba(14, 116, 144, 0.6)'}`,
-              color: isLight ? '#2563EB' : '#38BDF8',
+              backgroundColor: resolvedIsLight ? '#EFF6FF' : 'rgba(8, 47, 73, 0.8)',
+              border: `1px solid ${resolvedIsLight ? '#BFDBFE' : 'rgba(14, 116, 144, 0.6)'}`,
+              color: resolvedIsLight ? '#2563EB' : '#38BDF8',
             }}
           >
             <TrendingDown className="w-4 h-4" />
@@ -568,22 +588,22 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
             <div className="flex items-center gap-2">
               <span
                 className="font-display font-bold text-xs uppercase tracking-wider"
-                style={{ color: isLight ? '#111827' : '#E2E8F0' }}
+                style={{ color: resolvedIsLight ? '#111827' : '#E2E8F0' }}
               >
                 D3.js Historical Price Trends
               </span>
               <span
                 className="text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold border"
                 style={{
-                  backgroundColor: isLight ? '#F3F4F6' : '#1E293B',
-                  borderColor: isLight ? '#D1D5DB' : '#334155',
-                  color: isLight ? '#374151' : '#94A3B8',
+                  backgroundColor: resolvedIsLight ? '#F3F4F6' : '#1E293B',
+                  borderColor: resolvedIsLight ? '#D1D5DB' : '#334155',
+                  color: resolvedIsLight ? '#374151' : '#94A3B8',
                 }}
               >
                 {daysRange}D Range
               </span>
             </div>
-            <p className="text-[11px]" style={{ color: isLight ? '#4B5563' : '#94A3B8' }}>
+            <p className="text-[11px]" style={{ color: resolvedIsLight ? '#4B5563' : '#94A3B8' }}>
               D3 trajectory analysis comparing current list price against verified historical benchmarks
             </p>
           </div>
@@ -594,8 +614,8 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
           <div
             className="flex items-center gap-1 rounded-xl p-1 text-xs font-mono border"
             style={{
-              backgroundColor: isLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.9)',
-              borderColor: isLight ? '#D1D5DB' : '#1E293B',
+              backgroundColor: resolvedIsLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.9)',
+              borderColor: resolvedIsLight ? '#D1D5DB' : '#1E293B',
             }}
           >
             {[7, 14, 30, 60].map((days) => (
@@ -605,10 +625,10 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
                 onClick={() => setDaysRange(days)}
                 className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[11px] ${
                   daysRange === days
-                    ? isLight
+                    ? resolvedIsLight
                       ? 'bg-blue-600 text-white font-bold shadow-sm'
                       : 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
-                    : isLight
+                    : resolvedIsLight
                     ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
                 }`}
@@ -625,8 +645,8 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
         <div
           className="p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
           style={{
-            backgroundColor: isLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.7)',
-            borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.8)',
+            backgroundColor: resolvedIsLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.7)',
+            borderColor: resolvedIsLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.8)',
           }}
         >
           <div className="space-y-1 flex-1">
@@ -642,22 +662,22 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
               </span>
               <span
                 className="text-[11px] font-mono font-medium"
-                style={{ color: isLight ? '#4B5563' : '#94A3B8' }}
+                style={{ color: resolvedIsLight ? '#4B5563' : '#94A3B8' }}
               >
                 Benchmark Verdict
               </span>
             </div>
-            <p className="text-xs leading-relaxed" style={{ color: isLight ? '#374151' : '#CBD5E1' }}>
+            <p className="text-xs leading-relaxed" style={{ color: resolvedIsLight ? '#374151' : '#CBD5E1' }}>
               {dealAssessment.explainer}
             </p>
           </div>
 
           <div
             className="flex items-center gap-4 text-xs font-mono pt-2 sm:pt-0 sm:border-l sm:pl-4"
-            style={{ borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
+            style={{ borderColor: resolvedIsLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
           >
             <div>
-              <div className="text-[10px] uppercase font-bold" style={{ color: isLight ? '#4B5563' : '#94A3B8' }}>
+              <div className="text-[10px] uppercase font-bold" style={{ color: resolvedIsLight ? '#4B5563' : '#94A3B8' }}>
                 30D Floor
               </div>
               <div className="font-bold text-emerald-600 dark:text-emerald-400">
@@ -665,18 +685,18 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase font-bold" style={{ color: isLight ? '#4B5563' : '#94A3B8' }}>
+              <div className="text-[10px] uppercase font-bold" style={{ color: resolvedIsLight ? '#4B5563' : '#94A3B8' }}>
                 30D Average
               </div>
-              <div className="font-bold" style={{ color: isLight ? '#1F2937' : '#F1F5F9' }}>
+              <div className="font-bold" style={{ color: resolvedIsLight ? '#1F2937' : '#F1F5F9' }}>
                 ₹{dealAssessment.avgPrice.toLocaleString('en-IN')}
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase font-bold" style={{ color: isLight ? '#4B5563' : '#94A3B8' }}>
+              <div className="text-[10px] uppercase font-bold" style={{ color: resolvedIsLight ? '#4B5563' : '#94A3B8' }}>
                 30D Peak
               </div>
-              <div className="font-bold" style={{ color: isLight ? '#6B7280' : '#94A3B8' }}>
+              <div className="font-bold" style={{ color: resolvedIsLight ? '#6B7280' : '#94A3B8' }}>
                 ₹{dealAssessment.maxPrice.toLocaleString('en-IN')}
               </div>
             </div>
@@ -689,7 +709,7 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <span
             className="text-[11px] font-mono mr-1"
-            style={{ color: isLight ? '#4B5563' : '#94A3B8' }}
+            style={{ color: resolvedIsLight ? '#4B5563' : '#94A3B8' }}
           >
             Products:
           </span>
@@ -703,18 +723,18 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
                 className="px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-2 border transition-all cursor-pointer shadow-xs"
                 style={{
                   backgroundColor: isVisible
-                    ? isLight
+                    ? resolvedIsLight
                       ? '#FFFFFF'
                       : '#0F172A'
-                    : isLight
+                    : resolvedIsLight
                     ? '#F3F4F6'
                     : 'rgba(15, 23, 42, 0.4)',
-                  borderColor: isVisible ? series.color : isLight ? '#D1D5DB' : '#334155',
+                  borderColor: isVisible ? series.color : resolvedIsLight ? '#D1D5DB' : '#334155',
                   color: isVisible
-                    ? isLight
+                    ? resolvedIsLight
                       ? '#111827'
                       : '#FFFFFF'
-                    : isLight
+                    : resolvedIsLight
                     ? '#6B7280'
                     : '#64748B',
                 }}
@@ -744,16 +764,16 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
             ref={tooltipRef}
             className="absolute top-2 right-4 pointer-events-none z-10 rounded-xl p-2.5 shadow-2xl backdrop-blur-md max-w-xs space-y-1.5 border animate-in fade-in duration-150"
             style={{
-              backgroundColor: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(2, 6, 23, 0.95)',
-              borderColor: isLight ? '#D1D5DB' : '#334155',
-              color: isLight ? '#111827' : '#FFFFFF',
+              backgroundColor: resolvedIsLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(2, 6, 23, 0.95)',
+              borderColor: resolvedIsLight ? '#D1D5DB' : '#334155',
+              color: resolvedIsLight ? '#111827' : '#FFFFFF',
             }}
           >
             <div
               className="text-[10px] font-mono flex items-center gap-1.5 border-b pb-1"
               style={{
-                color: isLight ? '#4B5563' : '#94A3B8',
-                borderColor: isLight ? '#E5E7EB' : '#1E293B',
+                color: resolvedIsLight ? '#4B5563' : '#94A3B8',
+                borderColor: resolvedIsLight ? '#E5E7EB' : '#1E293B',
               }}
             >
               <Calendar className="w-3 h-3 text-cyan-500" />
@@ -768,14 +788,14 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
                   />
                   <span
                     className="truncate text-[11px]"
-                    style={{ color: isLight ? '#374151' : '#E2E8F0' }}
+                    style={{ color: resolvedIsLight ? '#374151' : '#E2E8F0' }}
                   >
                     {item.name}
                   </span>
                 </div>
                 <span
                   className="font-mono font-bold shrink-0"
-                  style={{ color: isLight ? '#111827' : '#FFFFFF' }}
+                  style={{ color: resolvedIsLight ? '#111827' : '#FFFFFF' }}
                 >
                   ₹{item.price.toLocaleString('en-IN')}
                 </span>
@@ -788,29 +808,29 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
       {/* Key Metric Insights Summary Footer */}
       <div
         className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t text-xs font-mono"
-        style={{ borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
+        style={{ borderColor: resolvedIsLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.6)' }}
       >
         {activeSeries.map((s) => (
           <div
             key={s.product.id}
             className="p-2.5 rounded-xl border space-y-1 shadow-xs"
             style={{
-              backgroundColor: isLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.6)',
-              borderColor: isLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.8)',
+              backgroundColor: resolvedIsLight ? '#F9FAFB' : 'rgba(15, 23, 42, 0.6)',
+              borderColor: resolvedIsLight ? '#E5E7EB' : 'rgba(51, 65, 85, 0.8)',
             }}
           >
             <div className="flex items-center justify-between">
               <span
                 className="text-[10px] truncate max-w-[100px]"
-                style={{ color: isLight ? '#4B5563' : '#94A3B8' }}
+                style={{ color: resolvedIsLight ? '#4B5563' : '#94A3B8' }}
               >
                 {s.product.name}
               </span>
               <span
                 className="text-[10px] px-1.5 py-0.5 rounded font-bold"
                 style={{
-                  backgroundColor: isLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.2)',
-                  color: isLight ? '#15803D' : '#34D399',
+                  backgroundColor: resolvedIsLight ? '#DCFCE7' : 'rgba(16, 185, 129, 0.2)',
+                  color: resolvedIsLight ? '#15803D' : '#34D399',
                 }}
               >
                 -{s.dropFromPeakPct}% Peak
@@ -819,13 +839,13 @@ export const D3PriceTrendChart: React.FC<D3PriceTrendChartProps> = ({
             <div className="flex items-baseline justify-between">
               <span
                 className="font-bold text-sm font-mono"
-                style={{ color: isLight ? '#111827' : '#FFFFFF' }}
+                style={{ color: resolvedIsLight ? '#111827' : '#FFFFFF' }}
               >
                 ₹{s.currentPrice.toLocaleString('en-IN')}
               </span>
               <span
                 className="text-[10px]"
-                style={{ color: isLight ? '#6B7280' : '#64748B' }}
+                style={{ color: resolvedIsLight ? '#6B7280' : '#64748B' }}
               >
                 Low: ₹{s.minPrice.toLocaleString('en-IN')}
               </span>

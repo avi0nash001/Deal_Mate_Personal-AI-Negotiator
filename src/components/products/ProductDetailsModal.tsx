@@ -389,6 +389,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
             height={260}
             showTimeRangeSelector={true}
             initialDays={30}
+            isLight={isLight}
           />
         </div>
       </div>

@@ -48,6 +48,8 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
   } | null>(null);
   const recognitionRef = useRef<any>(null);
 
+  const [unsupportedError, setUnsupportedError] = useState<string | null>(null);
+
   // Clear feedback badge after 6 seconds
   useEffect(() => {
     if (lastActionFeedback) {
@@ -73,6 +75,7 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
 
   const startListening = () => {
     if (disabled) return;
+    setUnsupportedError(null);
 
     const SpeechRecognitionAPI =
       typeof window !== 'undefined'
@@ -80,7 +83,7 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
         : null;
 
     if (!SpeechRecognitionAPI) {
-      alert('Speech Recognition is not supported in this browser. Please use Chrome or Edge.');
+      setUnsupportedError('Speech Recognition is not supported in this browser. Please use manual price/budget controls.');
       return;
     }
 
@@ -194,13 +197,27 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
     }
   };
 
+  // Auto-resolve isLight if not passed explicitly or check document/body theme
+  const resolvedIsLight = (() => {
+    if (typeof isLight === 'boolean' && isLight) return true;
+    if (typeof document !== 'undefined') {
+      const isDarkClass = document.documentElement.classList.contains('dark') || document.body.classList.contains('theme-warm-graphite');
+      if (isDarkClass) return false;
+      const themeAttr = document.body.className;
+      if (themeAttr.includes('theme-pure-white') || themeAttr.includes('theme-solar-gold')) return true;
+    }
+    return isLight;
+  })();
+
   return (
     <div
       className={`rounded-2xl border transition-all ${
         isListening
-          ? 'bg-gradient-to-r from-[#0C233F] via-[#0E1F38] to-[#0A1A2F] border-cyan-400 shadow-xl shadow-cyan-950/60 ring-1 ring-cyan-400/40'
-          : isLight
-          ? 'bg-slate-100 border-slate-300 shadow-sm'
+          ? resolvedIsLight
+            ? 'bg-blue-50/90 border-blue-400 shadow-md ring-1 ring-blue-400/40'
+            : 'bg-gradient-to-r from-[#0C233F] via-[#0E1F38] to-[#0A1A2F] border-cyan-400 shadow-xl shadow-cyan-950/60 ring-1 ring-cyan-400/40'
+          : resolvedIsLight
+          ? 'bg-white border-slate-200/90 shadow-sm'
           : 'bg-[#0E172A] border-slate-700/90 shadow-md'
       } ${compact ? 'p-3 space-y-2.5' : 'p-3.5 sm:p-4 space-y-3'}`}
     >
@@ -211,10 +228,12 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
             type="button"
             onClick={handleToggle}
             disabled={disabled}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-400 ${
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer focus:outline-none focus:ring-2 ${
               isListening
                 ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-lg shadow-rose-500/50 scale-105 border border-rose-400 ring-2 ring-rose-400/40'
-                : 'bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 border border-cyan-400/60 hover:border-cyan-300 shadow-sm'
+                : resolvedIsLight
+                ? 'bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 hover:border-blue-300 shadow-xs focus:ring-blue-400'
+                : 'bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 border border-cyan-400/60 hover:border-cyan-300 shadow-sm focus:ring-cyan-400'
             }`}
             title={isListening ? 'Stop listening' : 'Start voice command'}
             aria-label={isListening ? 'Stop listening' : 'Start voice command'}
@@ -222,7 +241,7 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
             {isListening ? (
               <MicOff className="w-5 h-5 text-white" />
             ) : (
-              <Mic className="w-5 h-5 text-cyan-300" />
+              <Mic className={`w-5 h-5 ${resolvedIsLight ? 'text-blue-600' : 'text-cyan-300'}`} />
             )}
           </button>
 
@@ -230,7 +249,7 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
             <div className="flex items-center gap-2">
               <span
                 className={`text-xs sm:text-sm font-display font-bold tracking-wide flex items-center gap-1.5 ${
-                  isLight ? 'text-slate-900' : 'text-white'
+                  resolvedIsLight ? 'text-slate-900' : 'text-white'
                 }`}
               >
                 <span>Voice Command Assistant</span>
@@ -239,9 +258,13 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
                 )}
               </span>
             </div>
-            <p className="text-xs font-mono text-slate-300 font-medium mt-0.5">
+            <p
+              className={`text-xs font-mono font-medium mt-0.5 ${
+                resolvedIsLight ? 'text-slate-600' : 'text-slate-300'
+              }`}
+            >
               {isListening ? (
-                <span className="text-cyan-300 font-semibold animate-pulse flex items-center gap-1">
+                <span className={`${resolvedIsLight ? 'text-blue-700' : 'text-cyan-300'} font-semibold animate-pulse flex items-center gap-1`}>
                   <span>Listening... Speak target price or max budget</span>
                 </span>
               ) : (
@@ -253,15 +276,23 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
 
         {/* Live Audio Visualizer waves when listening */}
         {isListening ? (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-950/90 border border-rose-600 text-rose-200 text-xs font-mono font-bold shadow-md shadow-rose-950/60">
-            <span className="w-1.5 h-3.5 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1.5 h-5 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1.5 h-3 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          <div
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold shadow-md ${
+              resolvedIsLight
+                ? 'bg-rose-50 border border-rose-300 text-rose-700 shadow-rose-100'
+                : 'bg-rose-950/90 border border-rose-600 text-rose-200 shadow-rose-950/60'
+            }`}
+          >
+            <span className="w-1.5 h-3.5 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-5 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-3 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
             <span className="ml-1 tracking-wider">SPEAK NOW</span>
             <button
               type="button"
               onClick={stopListening}
-              className="ml-1 p-0.5 rounded hover:bg-rose-900 text-rose-200 cursor-pointer"
+              className={`ml-1 p-0.5 rounded cursor-pointer ${
+                resolvedIsLight ? 'hover:bg-rose-100 text-rose-700' : 'hover:bg-rose-900 text-rose-200'
+              }`}
               title="Stop Recording"
             >
               <Square className="w-3.5 h-3.5 fill-current" />
@@ -272,7 +303,11 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
             type="button"
             onClick={startListening}
             disabled={disabled}
-            className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/60 text-cyan-300 text-xs font-mono font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+              resolvedIsLight
+                ? 'bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700'
+                : 'bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/60 text-cyan-300'
+            }`}
           >
             <Mic className="w-3.5 h-3.5" />
             <span>Start Listening</span>
@@ -282,41 +317,94 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
 
       {/* Live Interim Transcript Display */}
       {isListening && interimTranscript && (
-        <div className="px-3 py-2 rounded-xl bg-[#08101E] border border-cyan-500/60 text-xs font-mono text-cyan-200 flex items-center gap-2 shadow-inner">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
-          <span className="text-cyan-400 font-bold">Heard:</span>
+        <div
+          className={`px-3 py-2 rounded-xl border text-xs font-mono flex items-center gap-2 shadow-inner ${
+            resolvedIsLight
+              ? 'bg-blue-50 border-blue-300 text-blue-900'
+              : 'bg-[#08101E] border-cyan-500/60 text-cyan-200'
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full animate-ping shrink-0 ${resolvedIsLight ? 'bg-blue-600' : 'bg-cyan-400'}`} />
+          <span className={`font-bold ${resolvedIsLight ? 'text-blue-800' : 'text-cyan-400'}`}>Heard:</span>
           <span className="italic truncate">&ldquo;{interimTranscript}&rdquo;</span>
         </div>
       )}
 
       {/* Verbal Command Hints */}
-      <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-200 pt-1 border-t border-slate-700/80">
-        <span className="text-slate-300 text-[10px] uppercase font-bold tracking-wider">
+      <div
+        className={`flex flex-wrap items-center gap-2 text-xs font-mono pt-2 border-t ${
+          resolvedIsLight ? 'border-slate-200 text-slate-700' : 'border-slate-700/80 text-slate-200'
+        }`}
+      >
+        <span
+          className={`text-[10px] uppercase font-bold tracking-wider ${
+            resolvedIsLight ? 'text-slate-500' : 'text-slate-300'
+          }`}
+        >
           Quick Voice Actions:
         </span>
         <button
           type="button"
           onClick={() => handleQuickPreset('target', -100)}
-          className="px-2.5 py-1 rounded-xl bg-[#141F36] hover:bg-[#1B2B4A] active:bg-[#111A2D] border border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-cyan-200 text-xs font-mono font-medium shadow-xs transition-all flex items-center gap-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-400"
+          className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono font-medium shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer focus:outline-none focus:ring-1 ${
+            resolvedIsLight
+              ? 'bg-white hover:bg-slate-50 border-slate-200 hover:border-blue-400 text-slate-800 hover:text-blue-700 focus:ring-blue-400'
+              : 'bg-[#141F36] hover:bg-[#1B2B4A] active:bg-[#111A2D] border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-cyan-200 focus:ring-cyan-400'
+          }`}
         >
-          <TrendingDown className="w-3.5 h-3.5 text-cyan-400" />
+          <TrendingDown className={`w-3.5 h-3.5 ${resolvedIsLight ? 'text-blue-600' : 'text-cyan-400'}`} />
           <span>"Target ₹{(currentTargetPrice - 100).toLocaleString('en-IN')}"</span>
         </button>
         <button
           type="button"
           onClick={() => handleQuickPreset('budget', 500)}
-          className="px-2.5 py-1 rounded-xl bg-[#141F36] hover:bg-[#1B2B4A] active:bg-[#111A2D] border border-slate-700 hover:border-amber-400 text-slate-200 hover:text-amber-200 text-xs font-mono font-medium shadow-xs transition-all flex items-center gap-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-400"
+          className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono font-medium shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer focus:outline-none focus:ring-1 ${
+            resolvedIsLight
+              ? 'bg-white hover:bg-slate-50 border-slate-200 hover:border-amber-400 text-slate-800 hover:text-amber-700 focus:ring-amber-400'
+              : 'bg-[#141F36] hover:bg-[#1B2B4A] active:bg-[#111A2D] border-slate-700 hover:border-amber-400 text-slate-200 hover:text-amber-200 focus:ring-amber-400'
+          }`}
         >
-          <Wallet className="w-3.5 h-3.5 text-amber-400" />
+          <Wallet className={`w-3.5 h-3.5 ${resolvedIsLight ? 'text-amber-600' : 'text-amber-400'}`} />
           <span>"Budget ₹{(currentMaxBudget + 500).toLocaleString('en-IN')}"</span>
         </button>
       </div>
+
+      {/* Unsupported Browser / Mic Notice */}
+      {unsupportedError && (
+        <div
+          className={`px-3 py-2 rounded-xl border text-xs font-mono flex items-center justify-between gap-2 ${
+            resolvedIsLight
+              ? 'bg-amber-50 border-amber-300 text-amber-900'
+              : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+          }`}
+        >
+          <div className="flex items-center gap-1.5">
+            <AlertCircle className={`w-4 h-4 shrink-0 ${resolvedIsLight ? 'text-amber-600' : 'text-amber-400'}`} />
+            <span>{unsupportedError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUnsupportedError(null)}
+            className={`p-1 rounded-lg cursor-pointer ${
+              resolvedIsLight ? 'hover:bg-amber-100 text-amber-700' : 'hover:bg-white/10 text-slate-300 hover:text-white'
+            }`}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Confirmation feedback banner */}
       {lastActionFeedback && (
         <div
           className={`px-3 py-2 rounded-xl border text-xs font-mono flex items-center justify-between gap-2 shadow-md animate-in fade-in duration-200 ${
-            lastActionFeedback.type === 'target'
+            resolvedIsLight
+              ? lastActionFeedback.type === 'target'
+                ? 'bg-blue-50 border-blue-300 text-blue-900'
+                : lastActionFeedback.type === 'budget'
+                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                : 'bg-slate-100 border-slate-300 text-slate-800'
+              : lastActionFeedback.type === 'target'
               ? 'bg-cyan-950/80 border-cyan-500/80 text-cyan-200'
               : lastActionFeedback.type === 'budget'
               ? 'bg-amber-950/80 border-amber-500/80 text-amber-200'
@@ -325,9 +413,9 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
         >
           <div className="flex items-center gap-2 min-w-0">
             {lastActionFeedback.type === 'unrecognized' ? (
-              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+              <AlertCircle className={`w-4 h-4 shrink-0 ${resolvedIsLight ? 'text-amber-600' : 'text-amber-400'}`} />
             ) : (
-              <Check className="w-4 h-4 shrink-0 text-emerald-400" />
+              <Check className={`w-4 h-4 shrink-0 ${resolvedIsLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
             )}
             <span className="truncate font-medium">{lastActionFeedback.text}</span>
           </div>
@@ -337,7 +425,11 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
               <button
                 type="button"
                 onClick={startListening}
-                className="px-2 py-0.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold flex items-center gap-1 cursor-pointer ${
+                  resolvedIsLight
+                    ? 'bg-blue-100 hover:bg-blue-200 border-blue-300 text-blue-800'
+                    : 'bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-400/50 text-cyan-300'
+                }`}
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Retry</span>
@@ -346,7 +438,9 @@ export const VoiceNegotiationController: React.FC<VoiceNegotiationControllerProp
             <button
               type="button"
               onClick={() => setLastActionFeedback(null)}
-              className="p-1 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white cursor-pointer"
+              className={`p-1 rounded-lg cursor-pointer ${
+                resolvedIsLight ? 'hover:bg-black/5 text-slate-500 hover:text-slate-800' : 'hover:bg-white/10 text-slate-300 hover:text-white'
+              }`}
               title="Dismiss"
             >
               <X className="w-3.5 h-3.5" />
